@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Django settings for config project.
 
@@ -10,22 +12,129 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_local_env():
+    """Load variables from .env when running locally."""
+    env_path = BASE_DIR / ".env"
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+_load_local_env()
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_list(name: str) -> list[str]:
+    value = os.getenv(name, "")
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _env_value(name: str, default: str) -> str:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    return value
+
+
+def _env_path(name: str, default: Path) -> Path:
+    return Path(_env_value(name, str(default)))
+
+
+ENVIRONMENT = os.getenv("DJANGO_ENV", "development").lower()
+
+
+def _required_setting(name: str, fallback: str | None = None) -> str:
+    value = os.getenv(name)
+    if value:
+        return value
+    if fallback is not None and ENVIRONMENT != "production":
+        return fallback
+    if ENVIRONMENT == "production":
+        raise ImproperlyConfigured(f"{name} must be set in production.")
+    raise ImproperlyConfigured(f"{name} must be set")
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(tauqa3@p8o*s17o-7)g&9zha5e%4-bseeg5*y)vusfs#rmc$l'
+SECRET_KEY = _required_setting(
+    "DJANGO_SECRET_KEY",
+    fallback='django-insecure-(tauqa3@p8o*s17o-7)g&9zha5e%4-bseeg5*y)vusfs#rmc$l',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool("DJANGO_DEBUG", default=ENVIRONMENT != "production")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS")
+
+CSRF_TRUSTED_ORIGINS = _env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+
+
+def _add_site_host():
+    site_host = os.getenv("DJANGO_SITE_HOST", "").strip()
+    if not site_host:
+        return
+
+    normalized = site_host if "//" in site_host else f"//{site_host}"
+    parsed = urlparse(normalized)
+    hostname = parsed.hostname
+    if not hostname:
+        return
+    host_with_port = hostname
+    if parsed.port:
+        host_with_port = f"{hostname}:{parsed.port}"
+
+    if host_with_port not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host_with_port)
+
+    if CSRF_TRUSTED_ORIGINS:
+        return
+
+    scheme = parsed.scheme or "https"
+    origin = f"{scheme}://{host_with_port}"
+    CSRF_TRUSTED_ORIGINS.append(origin)
+
+
+_add_site_host()
+
+
+SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", default=ENVIRONMENT == "production")
+
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0"))
+
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False
+)
+
+SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=False)
+
+SESSION_COOKIE_SECURE = _env_bool("DJANGO_SESSION_COOKIE_SECURE", default=ENVIRONMENT == "production")
+
+CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", default=ENVIRONMENT == "production")
 
 
 # Application definition
@@ -39,6 +148,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     "products",
 ]
+
+
+# 库存警告
+LOW_STOCK_ALERT_THRESHOLD = int(os.getenv("LOW_STOCK_ALERT_THRESHOLD", "600000"))
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -55,7 +168,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -80,6 +193,63 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+
+def _database_from_url(url: str) -> dict:
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+    engine_map = {
+        "postgres": 'django.db.backends.postgresql',
+        "postgresql": 'django.db.backends.postgresql',
+        "psql": 'django.db.backends.postgresql',
+        "mysql": 'django.db.backends.mysql',
+        "mysql2": 'django.db.backends.mysql',
+        "sqlite": 'django.db.backends.sqlite3',
+        "sqlite3": 'django.db.backends.sqlite3',
+    }
+
+    if scheme not in engine_map:
+        raise ImproperlyConfigured(f"Unsupported DATABASE_URL scheme: {scheme}")
+
+    engine = engine_map[scheme]
+    if engine == 'django.db.backends.sqlite3':
+        # sqlite URLs can be sqlite:///path/to/db.sqlite3 or sqlite://:memory:
+        path = parsed.path or parsed.netloc
+        if not path:
+            raise ImproperlyConfigured("SQLite DATABASE_URL must include a path or :memory:")
+        name = path
+    else:
+        name = parsed.path.lstrip('/') or parsed.hostname
+        if not name:
+            raise ImproperlyConfigured("DATABASE_URL must include a database name")
+
+    config = {
+        'ENGINE': engine,
+        'NAME': name,
+    }
+
+    if parsed.username:
+        config['USER'] = parsed.username
+    if parsed.password:
+        config['PASSWORD'] = parsed.password
+    if parsed.hostname:
+        config['HOST'] = parsed.hostname
+    if parsed.port:
+        config['PORT'] = str(parsed.port)
+
+    options = parse_qs(parsed.query)
+    if options:
+        config.setdefault('OPTIONS', {})
+        for key, value in options.items():
+            config['OPTIONS'][key] = value[-1]
+
+    return config
+
+
+if DATABASE_URL:
+    DATABASES['default'] = _database_from_url(DATABASE_URL)
 
 
 # Password validation
@@ -116,9 +286,25 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = _env_value("DJANGO_STATIC_URL", "/static/")
+MEDIA_URL = _env_value("DJANGO_MEDIA_URL", "/media/")
 
-STATIC_ROOT = BASE_DIR / "staticfiles"
+# 开发资源目录，默认指向 apps 下的 static
+STATICFILES_DIRS = [BASE_DIR / "products" / "static"]
+
+# 生产环境：collectstatic 收集输出目录（必须和 MEDIA_ROOT 不同）
+STATIC_ROOT = _env_path("DJANGO_STATIC_ROOT", BASE_DIR / "staticfiles")
+MEDIA_ROOT = _env_path("DJANGO_MEDIA_ROOT", BASE_DIR / "media")
+
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "products:inventory_dashboard"
+LOGOUT_REDIRECT_URL = "login"
+
+# 强制保护：避免 STATIC_ROOT 和 MEDIA_ROOT 意外相同（例如 .env 写错）
+if STATIC_ROOT.resolve() == MEDIA_ROOT.resolve():
+    raise ImproperlyConfigured("MEDIA_ROOT and STATIC_ROOT must be different directories.")
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

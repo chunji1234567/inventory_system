@@ -1,48 +1,59 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from products.models import Item, Unit
+from products.models import Item, Unit, Warehouse
 
 
+@login_required
 def item_list(request):
-    items = Item.objects.order_by("sku")
+    items = Item.objects.select_related("warehouse").order_by("name")
+    warehouses = Warehouse.objects.order_by("name")
     return render(
         request,
         "products/item_list.html",
         {
             "items": items,
             "units": Unit.choices,
+            "warehouses": warehouses,
         },
     )
 
 
+@login_required
 def item_create(request):
     if request.method != "POST":
         return redirect(reverse("products:item_list"))
 
-    sku = (request.POST.get("sku") or "").strip()
     name = (request.POST.get("name") or "").strip()
     unit = (request.POST.get("unit") or "").strip()
+    warehouse_id = (request.POST.get("warehouse_id") or "").strip()
 
-    if not sku or not name or not unit:
-        messages.error(request, "新增失败：SKU / 名称 / 单位不能为空")
+    if not name or not unit or not warehouse_id:
+        messages.error(request, "新增失败：名称 / 单位 / 仓库不能为空")
         return redirect(reverse("products:item_list"))
 
-    if Item.objects.filter(sku=sku).exists():
-        messages.error(request, f"新增失败：SKU 已存在（{sku}）")
+    warehouse = Warehouse.objects.filter(id=warehouse_id).first()
+    if warehouse is None:
+        messages.error(request, "新增失败：请选择有效仓库")
+        return redirect(reverse("products:item_list"))
+
+    if Item.objects.filter(name=name).exists():
+        messages.error(request, f"新增失败：物品名称已存在（{name}）")
         return redirect(reverse("products:item_list"))
 
     Item.objects.create(
-        sku=sku,
         name=name,
         unit=unit,
+        warehouse=warehouse,
         is_active=True,
     )
     messages.success(request, "物品已新增")
     return redirect(reverse("products:item_list"))
 
 
+@login_required
 def item_update(request, pk: int):
     if request.method != "POST":
         return redirect(reverse("products:item_list"))
@@ -51,21 +62,33 @@ def item_update(request, pk: int):
 
     name = (request.POST.get("name") or "").strip()
     unit = (request.POST.get("unit") or "").strip()
+    warehouse_id = (request.POST.get("warehouse_id") or "").strip()
     is_active = request.POST.get("is_active") == "on"
 
-    if not name or not unit:
-        messages.error(request, "更新失败：名称 / 单位不能为空")
+    if not name or not unit or not warehouse_id:
+        messages.error(request, "更新失败：名称 / 单位 / 仓库不能为空")
+        return redirect(reverse("products:item_list"))
+
+    warehouse = Warehouse.objects.filter(id=warehouse_id).first()
+    if warehouse is None:
+        messages.error(request, "更新失败：请选择有效仓库")
+        return redirect(reverse("products:item_list"))
+
+    if Item.objects.exclude(pk=item.pk).filter(name=name).exists():
+        messages.error(request, f"更新失败：物品名称已存在（{name}）")
         return redirect(reverse("products:item_list"))
 
     item.name = name
     item.unit = unit
+    item.warehouse = warehouse
     item.is_active = is_active
-    item.save(update_fields=["name", "unit", "is_active"])
+    item.save(update_fields=["name", "unit", "warehouse", "is_active"])
 
     messages.success(request, "物品已更新")
     return redirect(reverse("products:item_list"))
 
 
+@login_required
 def item_toggle_active(request, pk: int):
     if request.method != "POST":
         return redirect(reverse("products:item_list"))

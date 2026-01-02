@@ -5,7 +5,7 @@
 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
   <div class="space-y-1">
     <h1 class="text-2xl font-semibold text-slate-900">物品管理</h1>
-    <p class="text-sm text-slate-500">SKU 为稳定标识，不可删除，仅支持停用</p>
+    <p class="text-sm text-slate-500">维护物品名称、单位与所属仓库</p>
   </div>
 
   <button id="btnNewItem"
@@ -18,8 +18,8 @@
   <table class="min-w-full divide-y divide-slate-200 text-sm">
     <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
       <tr>
-        <th class="px-4 py-3 text-left">SKU</th>
         <th class="px-4 py-3 text-left">名称</th>
+        <th class="px-4 py-3 text-left">仓库</th>
         <th class="px-4 py-3 text-left">单位</th>
         <th class="px-4 py-3 text-left">状态</th>
         <th class="px-4 py-3 text-left">操作</th>
@@ -28,8 +28,14 @@
     <tbody class="divide-y divide-slate-100 bg-white text-slate-800">
       {% for it in items %}
         <tr class="hover:bg-slate-50/70">
-          <td class="px-4 py-3 font-mono">{{ it.sku }}</td>
           <td class="px-4 py-3">{{ it.name }}</td>
+          <td class="px-4 py-3 text-slate-500">
+            {% if it.warehouse %}
+              {{ it.warehouse.name }}
+            {% else %}
+              <span class="text-slate-400">未关联</span>
+            {% endif %}
+          </td>
           <td class="px-4 py-3 text-slate-500">{{ it.get_unit_display }}</td>
           <td class="px-4 py-3">
             {% if it.is_active %}
@@ -44,10 +50,10 @@
                 class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm hover:bg-slate-50"
                 data-edit
                 data-id="{{ it.id }}"
-                data-sku="{{ it.sku }}"
                 data-name="{{ it.name }}"
                 data-unit="{{ it.unit }}"
-                data-active="{{ it.is_active|yesno:'1,0' }}">
+                data-active="{{ it.is_active|yesno:'1,0' }}"
+                data-warehouse="{{ it.warehouse_id }}">
                 编辑
               </button>
 
@@ -83,10 +89,6 @@
   <form id="itemForm" method="post">
     {% csrf_token %}
     <div class="space-y-4 px-5 py-4">
-      <label class="block text-sm font-medium">SKU
-        <input id="fSku" name="sku" required
-          class="mt-1 w-full rounded-xl border px-3 py-2 text-sm">
-      </label>
       <label class="block text-sm font-medium">名称
         <input id="fName" name="name" required
           class="mt-1 w-full rounded-xl border px-3 py-2 text-sm">
@@ -96,6 +98,15 @@
           class="mt-1 w-full rounded-xl border px-3 py-2 text-sm">
           {% for value, label in units %}
             <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm font-medium">所属仓库
+        <select id="fWarehouse" name="warehouse_id" required
+          class="mt-1 w-full rounded-xl border px-3 py-2 text-sm">
+          <option value="" disabled selected>请选择仓库</option>
+          {% for wh in warehouses %}
+            <option value="{{ wh.id }}">{{ wh.name }}</option>
           {% endfor %}
         </select>
       </label>
@@ -117,9 +128,9 @@
   const title = document.getElementById("modalTitle");
   const form = document.getElementById("itemForm");
 
-  const fSku = document.getElementById("fSku");
   const fName = document.getElementById("fName");
   const fUnit = document.getElementById("fUnit");
+  const fWarehouse = document.getElementById("fWarehouse");
   const fActive = document.getElementById("fActive");
 
   function openModal() {
@@ -135,11 +146,12 @@
   document.getElementById("btnNewItem").onclick = () => {
     title.textContent = "新增物品";
     form.action = "{% url 'products:item_create' %}";
-    fSku.value = "";
     fName.value = "";
     if (fUnit.options.length > 0) fUnit.selectedIndex = 0;
+    if (fWarehouse.options.length > 0) {
+      fWarehouse.selectedIndex = 0;
+    }
     fActive.checked = true;
-    fSku.readOnly = false;
     openModal();
   };
 
@@ -147,11 +159,10 @@
     btn.onclick = () => {
       title.textContent = "编辑物品";
       form.action = `/items/${btn.dataset.id}/edit/`;
-      fSku.value = btn.dataset.sku;
       fName.value = btn.dataset.name;
       fUnit.value = btn.dataset.unit;
+      fWarehouse.value = btn.dataset.warehouse || "";
       fActive.checked = (btn.dataset.active === "1");
-      fSku.readOnly = true;
       openModal();
     };
   });

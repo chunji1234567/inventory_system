@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 class Unit(models.TextChoices):
     PCS = "PCS", "件"
     BOX = "BOX", "箱"
+    GE = "GE", "个"
+    ZHI = "ZHI", "只"
     OTHER = "OTHER", "其他"
 
 
@@ -16,41 +18,45 @@ class MoveType(models.TextChoices):
 
 
 class Warehouse(models.Model):
-    code = models.CharField(max_length=20, unique=True, verbose_name="仓库编码")
-    name = models.CharField(max_length=100, verbose_name="仓库名称")
+    name = models.CharField(max_length=100, unique=True, verbose_name="仓库名称")
     is_active = models.BooleanField(default=True, verbose_name="是否启用")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["code"]
+        ordering = ["name"]
         verbose_name = "仓库"
         verbose_name_plural = "仓库"
 
     def __str__(self):
-        return f"[{self.code}] {self.name}"
+        return self.name
 
 
 class Item(models.Model):
-    """
-    物品主档（SKU 主数据）
-    只定义：是什么东西
-    """
-    sku = models.CharField(max_length=50, unique=True, verbose_name="SKU")
-    name = models.CharField(max_length=100, verbose_name="名称")
+    """物品主档（SKU 字段已移除，仅保留名称）。"""
+    name = models.CharField(max_length=100, unique=True, verbose_name="名称")
     unit = models.CharField(max_length=20, choices=Unit.choices, default=Unit.PCS, verbose_name="单位")
     category = models.CharField(max_length=50, blank=True, verbose_name="分类（可选）")
     barcode = models.CharField(max_length=80, blank=True, verbose_name="条码（可选）")
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="items",
+        null=True,
+        verbose_name="所属仓库",
+    )
 
     is_active = models.BooleanField(default=True, verbose_name="是否启用")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["sku"]
+        ordering = ["name"]
         verbose_name = "物品"
         verbose_name_plural = "物品"
 
     def __str__(self):
-        return f"[{self.sku}] {self.name}"
+        if self.warehouse_id:
+            return f"{self.name} @ {self.warehouse.name}"
+        return self.name
 
 
 class StockMove(models.Model):
@@ -101,7 +107,7 @@ class StockMove(models.Model):
             raise ValidationError({"quantity": "数量不能为 0"})
 
     def __str__(self):
-        return f"{self.move_type} {self.item.sku} {self.quantity}"
+        return f"{self.move_type} {self.item.name} {self.quantity}"
     
 
 
@@ -126,4 +132,4 @@ class StockBalance(models.Model):
         verbose_name_plural = "库存余额"
 
     def __str__(self):
-        return f"{self.item.sku} @ {self.warehouse.code}: {self.on_hand}"
+        return f"{self.item.name} @ {self.warehouse.name}: {self.on_hand}"

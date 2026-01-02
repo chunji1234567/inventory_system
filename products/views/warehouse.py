@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 
@@ -6,11 +7,13 @@ from products.forms import WarehouseForm
 from products.models import Warehouse
 
 
+@login_required
 def warehouse_list(request):
-    warehouses = Warehouse.objects.order_by("code")
+    warehouses = Warehouse.objects.order_by("name")
     return render(request, "products/warehouse_list.html", {"warehouses": warehouses})
 
 
+@login_required
 def warehouse_create(request):
     if request.method != "POST":
         return redirect(reverse("products:warehouse_list"))
@@ -24,6 +27,7 @@ def warehouse_create(request):
     return redirect(reverse("products:warehouse_list"))
 
 
+@login_required
 def warehouse_edit(request, pk: int):
     if request.method != "POST":
         return redirect(reverse("products:warehouse_list"))
@@ -38,6 +42,7 @@ def warehouse_edit(request, pk: int):
     return redirect(reverse("products:warehouse_list"))
 
 
+@login_required
 def warehouse_toggle_active(request, pk: int):
     if request.method != "POST":
         return redirect(reverse("products:warehouse_list"))

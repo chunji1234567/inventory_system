@@ -17,7 +17,6 @@
   <table class="min-w-full divide-y divide-slate-200 text-sm">
     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
       <tr>
-        <th class="px-4 py-3">编码</th>
         <th class="px-4 py-3">名称</th>
         <th class="px-4 py-3">启用</th>
         <th class="px-4 py-3">操作</th>
@@ -26,7 +25,6 @@
     <tbody class="divide-y divide-slate-100">
       {% for w in warehouses %}
         <tr class="transition hover:bg-slate-50/60">
-          <td class="px-4 py-3 font-mono text-sm text-slate-900">{{ w.code }}</td>
           <td class="px-4 py-3 text-slate-800">{{ w.name }}</td>
           <td class="px-4 py-3">
             {% if w.is_active %}
@@ -42,7 +40,6 @@
                 type="button"
                 data-action="edit"
                 data-pk="{{ w.pk }}"
-                data-code="{{ w.code }}"
                 data-name="{{ w.name }}"
                 data-active="{{ w.is_active|yesno:'1,0' }}"
               >编辑</button>
@@ -52,7 +49,6 @@
                 type="button"
                 data-action="toggle"
                 data-pk="{{ w.pk }}"
-                data-code="{{ w.code }}"
                 data-name="{{ w.name }}"
                 data-active="{{ w.is_active|yesno:'1,0' }}"
               >{% if w.is_active %}停用{% else %}启用{% endif %}</button>
@@ -61,7 +57,7 @@
         </tr>
       {% empty %}
         <tr>
-          <td colspan="4" class="px-4 py-6 text-center text-slate-500">暂无仓库</td>
+          <td colspan="3" class="px-4 py-6 text-center text-slate-500">暂无仓库</td>
         </tr>
       {% endfor %}
     </tbody>
@@ -81,12 +77,6 @@
   <form method="post" id="warehouseForm" class="space-y-0">
     {% csrf_token %}
     <div class="space-y-4 px-5 py-4">
-      <label class="block text-sm font-medium text-slate-700">
-        仓库编码
-        <input type="text" name="code" id="f_code" placeholder="例如: WH-A" required
-          class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
-      </label>
-
       <label class="block text-sm font-medium text-slate-700">
         仓库名称
         <input type="text" name="name" id="f_name" placeholder="例如: 主仓库" required
@@ -140,7 +130,6 @@
 
   const warehouseForm = document.getElementById("warehouseForm");
   const modalTitle = document.getElementById("modalTitle");
-  const fCode = document.getElementById("f_code");
   const fName = document.getElementById("f_name");
   const fActive = document.getElementById("f_active");
 
@@ -172,10 +161,8 @@
   document.getElementById("btnOpenCreate").addEventListener("click", () => {
     modalTitle.textContent = "新增仓库";
     warehouseForm.action = "{% url 'products:warehouse_create' %}";
-    fCode.value = "";
     fName.value = "";
     fActive.checked = true;
-    fCode.readOnly = false;
     openModal(modalForm);
   });
 
@@ -195,10 +182,8 @@
       if (action === "edit") {
         modalTitle.textContent = "编辑仓库";
         warehouseForm.action = `/warehouses/${pk}/edit/`;
-        fCode.value = btn.dataset.code || "";
         fName.value = btn.dataset.name || "";
         fActive.checked = btn.dataset.active === "1";
-        fCode.readOnly = true;
         openModal(modalForm);
       }
 
@@ -207,7 +192,7 @@
         const actionLabel = isActiveTarget ? "停用" : "启用";
         toggleForm.action = `/warehouses/${pk}/toggle/`;
         toggleTitle.textContent = `${actionLabel}仓库`;
-        toggleMessage.textContent = `确认${actionLabel}：${btn.dataset.code} - ${btn.dataset.name}？`;
+        toggleMessage.textContent = `确认${actionLabel}：${btn.dataset.name}？`;
         toggleConfirmBtn.textContent = `确认${actionLabel}`;
         openModal(modalToggle);
       }

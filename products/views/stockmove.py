@@ -1,11 +1,13 @@
 from decimal import Decimal
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import reverse
 
 from products.models import Warehouse, Item, StockMove, StockBalance, MoveType
 
 
+@login_required
 def inbound_create(request):
     if request.method != "POST":
         return redirect(reverse("products:inventory_dashboard"))
@@ -43,6 +45,7 @@ def inbound_create(request):
     return redirect(reverse("products:inventory_dashboard"))
 
 
+@login_required
 def outbound_create(request):
     if request.method != "POST":
         return redirect(reverse("products:inventory_dashboard"))
@@ -93,6 +96,7 @@ def outbound_create(request):
     return redirect(reverse("products:inventory_dashboard"))
 
 
+@login_required
 def adjust_create(request):
     if request.method != "POST":
         return redirect(reverse("products:inventory_dashboard"))

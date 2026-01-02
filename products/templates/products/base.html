@@ -12,10 +12,27 @@
     <nav class="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
       <div class="text-lg font-semibold">📦 库存系统</div>
       <div class="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-200">
-        <a class="transition hover:text-white" href="{% url 'products:inventory_dashboard' %}">库存看板</a>
+        <a class="transition hover:text-white" href="{% url 'products:inventory_dashboard' %}">库存预览</a>
         <a class="transition hover:text-white" href="{% url 'products:warehouse_list' %}">仓库管理</a>
-        <a href="{% url 'products:item_list' %}">物品管理</a>
+        <a class="transition hover:text-white" href="{% url 'products:item_list' %}">物品管理</a>
         <a class="transition hover:text-white" href="{% url 'products:stockmove_list' %}">库存流水</a>
+      </div>
+      <div class="flex flex-1 items-center justify-end gap-3 text-sm text-slate-200">
+        {% if request.user.is_authenticated %}
+          <span class="hidden text-xs uppercase tracking-wide text-slate-400 sm:inline">{{ request.user.get_username }}</span>
+          <form method="post" action="{% url 'logout' %}" class="flex items-center">
+            {% csrf_token %}
+            <button type="submit"
+              class="inline-flex items-center rounded-xl border border-white/30 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10">
+              退出登录
+            </button>
+          </form>
+        {% else %}
+          <a href="{% url 'login' %}"
+            class="inline-flex items-center rounded-xl border border-white/30 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10">
+            登录
+          </a>
+        {% endif %}
       </div>
     </nav>
   </header>

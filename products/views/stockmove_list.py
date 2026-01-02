@@ -1,9 +1,11 @@
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import render
 
 from products.models import StockMove, Warehouse, Item, MoveType
 
 
+@login_required
 def stockmove_list(request):
     warehouse_id = (request.GET.get("warehouse_id") or "").strip()
     item_id = (request.GET.get("item_id") or "").strip()
@@ -36,13 +38,12 @@ def stockmove_list(request):
         moves = moves.filter(
             Q(reference__icontains=q) |
             Q(note__icontains=q) |
-            Q(item__sku__icontains=q) |
             Q(item__name__icontains=q) |
             Q(warehouse__name__icontains=q)
         )
 
     warehouses = Warehouse.objects.filter(is_active=True).order_by("name")
-    items = Item.objects.filter(is_active=True).order_by("sku")
+    items = Item.objects.filter(is_active=True).order_by("name")
     move_type_options = [
         {"value": "ALL", "label": "全部", "active": move_type == "ALL"},
         {"value": MoveType.INBOUND, "label": "入库", "active": move_type == MoveType.INBOUND},
