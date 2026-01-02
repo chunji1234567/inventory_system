@@ -1,0 +1,342 @@
+{% extends "products/base.html" %}
+{% block title %}库存看板{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+  <div class="space-y-1">
+    <h1 class="text-2xl font-semibold text-slate-900">库存看板</h1>
+    <p class="text-sm text-slate-500">数据来源：StockBalance（由 StockMove 自动计算）</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <button id="btnNewInbound"
+      class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/25 transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900">
+      + 新入库
+    </button>
+  </div>
+</div>
+
+<form id="inventoryFilterForm" class="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" method="get">
+  <label class="flex flex-1 min-w-[180px] flex-col gap-1 text-sm font-medium text-slate-600">
+    <span>仓库</span>
+    <select name="warehouse"
+      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      <option value="">全部仓库</option>
+      {% for w in warehouses %}
+        <option value="{{ w.code }}" {% if selected_warehouse == w.code %}selected{% endif %}>
+          {{ w.name }}
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="flex flex-1 min-w-[200px] flex-col gap-1 text-sm font-medium text-slate-600">
+    <span>搜索</span>
+    <input type="text" name="q" placeholder="搜索 SKU / 名称" value="{{ q|default:'' }}"
+      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 shadow-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
+  </label>
+  <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
+    <input type="checkbox" name="show_inactive" value="1" {% if show_inactive %}checked{% endif %}
+      class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
+    显示停用物品
+  </label>
+  <div class="flex items-center gap-2">
+    <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+      type="submit">筛选</button>
+    <a class="inline-flex items-center rounded-xl border border-transparent bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+      href="{% url 'products:inventory_dashboard' %}">重置</a>
+  </div>
+</form>
+
+<div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="px-4 py-3">仓库</th>
+        <th class="px-4 py-3">SKU</th>
+        <th class="px-4 py-3">名称</th>
+        <th class="px-4 py-3 text-right">库存</th>
+        <th class="px-4 py-3">更新时间</th>
+        <th class="px-4 py-3">操作</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100 bg-white text-slate-800">
+      {% for b in balances %}
+        <tr class="transition hover:bg-slate-50/70">
+          <td class="px-4 py-3">{{ b.warehouse.name }}</td>
+          <td class="px-4 py-3 font-mono text-sm">{{ b.item.sku }}</td>
+          <td class="px-4 py-3">{{ b.item.name }}</td>
+          <td class="px-4 py-3 text-right font-semibold text-slate-900">
+            {{ b.on_hand }}
+            <span class="ml-1 text-xs font-normal text-slate-500">{{ b.item.get_unit_display }}</span>
+          </td>
+          <td class="px-4 py-3 text-slate-500">{{ b.updated_at|date:"Y-m-d H:i" }}</td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap gap-2">
+              <button type="button"
+                class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+                onclick="openInboundWith('{{ b.warehouse.id }}','{{ b.item.id }}')">
+                入库
+              </button>
+              <button type="button"
+                class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                {% if b.on_hand <= 0 %}disabled{% endif %}
+                onclick="openOutboundWith('{{ b.warehouse.id }}','{{ b.item.id }}')">
+                出库
+              </button>
+              <button type="button"
+                class="inline-flex items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 shadow-sm transition hover:bg-amber-100"
+                onclick="openAdjustWith('{{ b.warehouse.id }}','{{ b.item.id }}')">
+                调整
+              </button>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="7" class="px-4 py-6 text-center text-slate-500">暂无库存数据</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{{ balance_map|json_script:"balance-data" }}
+
+<div id="backdrop" class="fixed inset-0 z-30 hidden bg-slate-900/40"></div>
+
+<div id="modalInbound"
+  class="fixed left-1/2 top-10 z-40 hidden w-[560px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
+  <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">入库</div>
+  <form method="post" action="{% url 'products:inventory_inbound' %}" class="space-y-0">
+    {% csrf_token %}
+    <div class="space-y-4 px-5 py-4">
+      <label class="block text-sm font-medium text-slate-700">
+        仓库
+        <select id="inWarehouse" name="warehouse_id" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          <option value="">请选择</option>
+          {% for w in warehouses %}
+            <option value="{{ w.id }}">{{ w.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm font-medium text-slate-700">
+        物品
+        <select id="inItem" name="item_id" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          <option value="">请选择</option>
+          {% for it in items %}
+            <option value="{{ it.id }}" data-unit-label="{{ it.get_unit_display }}">{{ it.sku }} - {{ it.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm font-medium text-slate-700">
+        数量
+        <input type="number" name="quantity" step="1" min="1" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
+      <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+        type="button" onclick="closeAll()">取消</button>
+      <button class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800"
+        type="submit">提交</button>
+    </div>
+  </form>
+</div>
+
+<div id="modalOutbound"
+  class="fixed left-1/2 top-10 z-40 hidden w-[560px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
+  <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">出库</div>
+  <form method="post" action="{% url 'products:inventory_outbound' %}" class="space-y-0">
+    {% csrf_token %}
+    <div class="space-y-4 px-5 py-4">
+      <label class="block text-sm font-medium text-slate-700">
+        仓库
+        <select id="outWarehouse" name="warehouse_id" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          {% for w in warehouses %}
+            <option value="{{ w.id }}">{{ w.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm font-medium text-slate-700">
+        物品
+        <select id="outItem" name="item_id" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          {% for it in items %}
+            <option value="{{ it.id }}" data-unit-label="{{ it.get_unit_display }}">{{ it.sku }} - {{ it.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="space-y-2 text-sm text-slate-600">
+        <div>当前库存：
+          <span id="outOnHand" class="text-base font-semibold text-slate-900">0</span>
+          <span id="outOnHandUnit" class="ml-1 text-sm text-slate-500"></span>
+        </div>
+        <input type="number" name="quantity" step="1" min="1" required
+          class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </div>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
+      <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+        type="button" onclick="closeAll()">取消</button>
+      <button class="inline-flex items-center rounded-xl border border-red-200 bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-red-600/30 transition hover:bg-red-500"
+        type="submit">提交</button>
+    </div>
+  </form>
+</div>
+
+<div id="modalAdjust"
+  class="fixed left-1/2 top-10 z-40 hidden w-[600px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
+  <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">库存调整</div>
+  <form method="post" action="{% url 'products:inventory_adjust' %}" class="space-y-0">
+    {% csrf_token %}
+    <div class="space-y-4 px-5 py-4">
+      <label class="block text-sm font-medium text-slate-700">
+        仓库
+        <select id="adjustWarehouse" name="warehouse_id" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          {% for w in warehouses %}
+            <option value="{{ w.id }}">{{ w.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm font-medium text-slate-700">
+        物品
+        <select id="adjustItem" name="item_id" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          {% for it in items %}
+            <option value="{{ it.id }}" data-unit-label="{{ it.get_unit_display }}">{{ it.sku }} - {{ it.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm font-medium text-slate-700">
+        数量（正数增加，负数减少）
+        <div class="mt-1 flex items-center gap-2">
+          <input type="number" step="1" name="quantity" id="adjustQuantity" required
+            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          <span id="adjustUnitHint" class="text-sm text-slate-500"></span>
+        </div>
+        <p class="mt-1 text-xs text-slate-500">例如：+10 代表盘盈，-5 代表盘亏</p>
+      </label>
+      <label class="block text-sm font-medium text-slate-700">
+        单号/来源（可选）
+        <input type="text" name="reference" id="adjustReference"
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+      <label class="block text-sm font-medium text-slate-700">
+        备注（可选）
+        <textarea name="note" id="adjustNote" rows="3"
+          class="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"></textarea>
+      </label>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
+      <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+        type="button" onclick="closeAll()">取消</button>
+      <button class="inline-flex items-center rounded-xl border border-amber-200 bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-amber-500/30 transition hover:bg-amber-400"
+        type="submit">提交调整</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  const hiddenClass = "hidden";
+  const filterForm = document.getElementById("inventoryFilterForm");
+  const showInactiveToggle = filterForm ? filterForm.querySelector("input[name='show_inactive']") : null;
+
+  if (filterForm && showInactiveToggle) {
+    showInactiveToggle.addEventListener("change", () => {
+      filterForm.requestSubmit();
+    });
+  }
+
+  const backdrop = document.getElementById("backdrop");
+  const modalInbound = document.getElementById("modalInbound");
+  const modalOutbound = document.getElementById("modalOutbound");
+  const modalAdjust = document.getElementById("modalAdjust");
+
+  function openModal(m) {
+    backdrop.classList.remove(hiddenClass);
+    m.classList.remove(hiddenClass);
+  }
+  function closeAll() {
+    backdrop.classList.add(hiddenClass);
+    modalInbound.classList.add(hiddenClass);
+    modalOutbound.classList.add(hiddenClass);
+    if (modalAdjust) modalAdjust.classList.add(hiddenClass);
+  }
+
+  document.getElementById("btnNewInbound").onclick = () => {
+    document.getElementById("inWarehouse").value = "";
+    document.getElementById("inItem").value = "";
+    openModal(modalInbound);
+  };
+
+  const adjustWarehouse = document.getElementById("adjustWarehouse");
+  const adjustItem = document.getElementById("adjustItem");
+  const adjustQuantity = document.getElementById("adjustQuantity");
+  const adjustReference = document.getElementById("adjustReference");
+  const adjustNote = document.getElementById("adjustNote");
+  const adjustUnitHint = document.getElementById("adjustUnitHint");
+
+  function updateAdjustUnit() {
+    if (!adjustUnitHint || !adjustItem) return;
+    const option = adjustItem.options[adjustItem.selectedIndex];
+    adjustUnitHint.textContent = option ? option.dataset.unitLabel || "" : "";
+  }
+
+  if (adjustItem) {
+    adjustItem.addEventListener("change", updateAdjustUnit);
+  }
+
+  function resetAdjustFields() {
+    if (adjustQuantity) adjustQuantity.value = "";
+    if (adjustReference) adjustReference.value = "";
+    if (adjustNote) adjustNote.value = "";
+  }
+
+  const balanceData = JSON.parse(
+    document.getElementById("balance-data").textContent
+  );
+
+  const outWarehouse = document.getElementById("outWarehouse");
+  const outItem = document.getElementById("outItem");
+  const outOnHand = document.getElementById("outOnHand");
+  const outOnHandUnit = document.getElementById("outOnHandUnit");
+
+  function updateOutOnHand() {
+    const key = `${outWarehouse.value}-${outItem.value}`;
+    const quantity = balanceData[key] ?? "0";
+    const option = outItem.options[outItem.selectedIndex];
+    const unitLabel = option ? option.dataset.unitLabel || "" : "";
+    outOnHand.textContent = quantity;
+    if (outOnHandUnit) outOnHandUnit.textContent = unitLabel;
+  }
+
+  outWarehouse.onchange = updateOutOnHand;
+  outItem.onchange = updateOutOnHand;
+
+  function openInboundWith(w, i) {
+    document.getElementById("inWarehouse").value = w;
+    document.getElementById("inItem").value = i;
+    openModal(modalInbound);
+  }
+
+  function openOutboundWith(w, i) {
+    outWarehouse.value = w;
+    outItem.value = i;
+    updateOutOnHand();
+    openModal(modalOutbound);
+  }
+
+  function openAdjustWith(w, i) {
+    if (adjustWarehouse) adjustWarehouse.value = w;
+    if (adjustItem) adjustItem.value = i;
+    updateAdjustUnit();
+    resetAdjustFields();
+    openModal(modalAdjust);
+  }
+
+  backdrop.onclick = closeAll;
+</script>
+{% endblock %}

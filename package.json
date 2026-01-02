@@ -1,0 +1,17 @@
+{
+  "name": "inventory_system",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "tailwind:build": "tailwindcss -i ./products/static/src/tailwind.css -o ./products/static/css/tailwind.css --minify",
+    "tailwind:watch": "tailwindcss -i ./products/static/src/tailwind.css -o ./products/static/css/tailwind.css --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

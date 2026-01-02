@@ -1,0 +1,217 @@
+{% extends "products/base.html" %}
+{% block title %}仓库管理{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900">仓库管理</h1>
+    <p class="text-sm text-slate-500">维护仓库信息以便准确分仓记录</p>
+  </div>
+  <button class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/25 transition hover:bg-slate-800"
+    type="button" id="btnOpenCreate">
+    + 新增仓库
+  </button>
+</div>
+
+<div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="px-4 py-3">编码</th>
+        <th class="px-4 py-3">名称</th>
+        <th class="px-4 py-3">启用</th>
+        <th class="px-4 py-3">操作</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for w in warehouses %}
+        <tr class="transition hover:bg-slate-50/60">
+          <td class="px-4 py-3 font-mono text-sm text-slate-900">{{ w.code }}</td>
+          <td class="px-4 py-3 text-slate-800">{{ w.name }}</td>
+          <td class="px-4 py-3">
+            {% if w.is_active %}
+              <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">启用</span>
+            {% else %}
+              <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">停用</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap gap-2">
+              <button
+                class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                type="button"
+                data-action="edit"
+                data-pk="{{ w.pk }}"
+                data-code="{{ w.code }}"
+                data-name="{{ w.name }}"
+                data-active="{{ w.is_active|yesno:'1,0' }}"
+              >编辑</button>
+
+              <button
+                class="inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-medium shadow-sm transition {% if w.is_active %}border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100{% else %}border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100{% endif %}"
+                type="button"
+                data-action="toggle"
+                data-pk="{{ w.pk }}"
+                data-code="{{ w.code }}"
+                data-name="{{ w.name }}"
+                data-active="{{ w.is_active|yesno:'1,0' }}"
+              >{% if w.is_active %}停用{% else %}启用{% endif %}</button>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="4" class="px-4 py-6 text-center text-slate-500">暂无仓库</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="fixed inset-0 z-30 hidden bg-slate-900/40" id="backdrop"></div>
+
+<div id="modalForm"
+  class="fixed left-1/2 top-12 z-40 hidden w-[520px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
+  <header class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <strong id="modalTitle" class="text-base font-semibold text-slate-900">新增仓库</strong>
+    <button class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
+      type="button" id="btnCloseForm">关闭</button>
+  </header>
+
+  <form method="post" id="warehouseForm" class="space-y-0">
+    {% csrf_token %}
+    <div class="space-y-4 px-5 py-4">
+      <label class="block text-sm font-medium text-slate-700">
+        仓库编码
+        <input type="text" name="code" id="f_code" placeholder="例如: WH-A" required
+          class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+
+      <label class="block text-sm font-medium text-slate-700">
+        仓库名称
+        <input type="text" name="name" id="f_name" placeholder="例如: 主仓库" required
+          class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+
+      <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+        <input type="checkbox" name="is_active" id="f_active"
+          class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500">
+        启用
+      </label>
+    </div>
+
+    <footer class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
+      <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+        type="button" id="btnCancelForm">取消</button>
+      <button class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800"
+        type="submit">保存</button>
+    </footer>
+  </form>
+</div>
+
+<div id="modalToggle"
+  class="fixed left-1/2 top-12 z-40 hidden w-[520px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
+  <header class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <strong id="toggleTitle" class="text-base font-semibold text-slate-900">停用仓库</strong>
+    <button class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
+      type="button" id="btnCloseToggle">关闭</button>
+  </header>
+
+  <form method="post" id="toggleForm" class="space-y-0">
+    {% csrf_token %}
+    <main class="px-5 py-4 text-sm text-slate-700">
+      <p id="toggleMessage">确认操作？</p>
+    </main>
+    <footer class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
+      <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+        type="button" id="btnCancelToggle">取消</button>
+      <button class="inline-flex items-center rounded-xl border border-amber-200 bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-amber-500/30 transition hover:bg-amber-400"
+        type="submit" id="toggleConfirmBtn">确认</button>
+    </footer>
+  </form>
+</div>
+
+<script>
+  const hiddenClass = "hidden";
+  const backdrop = document.getElementById("backdrop");
+  const modalForm = document.getElementById("modalForm");
+  const modalToggle = document.getElementById("modalToggle");
+  const modals = [modalForm, modalToggle];
+
+  const warehouseForm = document.getElementById("warehouseForm");
+  const modalTitle = document.getElementById("modalTitle");
+  const fCode = document.getElementById("f_code");
+  const fName = document.getElementById("f_name");
+  const fActive = document.getElementById("f_active");
+
+  const toggleForm = document.getElementById("toggleForm");
+  const toggleTitle = document.getElementById("toggleTitle");
+  const toggleMessage = document.getElementById("toggleMessage");
+  const toggleConfirmBtn = document.getElementById("toggleConfirmBtn");
+
+  function showBackdrop() {
+    backdrop.classList.remove(hiddenClass);
+  }
+
+  function hideBackdropIfNeeded() {
+    if (modals.every((modal) => modal.classList.contains(hiddenClass))) {
+      backdrop.classList.add(hiddenClass);
+    }
+  }
+
+  function openModal(modal) {
+    showBackdrop();
+    modal.classList.remove(hiddenClass);
+  }
+
+  function closeModal(modal) {
+    modal.classList.add(hiddenClass);
+    hideBackdropIfNeeded();
+  }
+
+  document.getElementById("btnOpenCreate").addEventListener("click", () => {
+    modalTitle.textContent = "新增仓库";
+    warehouseForm.action = "{% url 'products:warehouse_create' %}";
+    fCode.value = "";
+    fName.value = "";
+    fActive.checked = true;
+    fCode.readOnly = false;
+    openModal(modalForm);
+  });
+
+  document.getElementById("btnCloseForm").onclick = () => closeModal(modalForm);
+  document.getElementById("btnCancelForm").onclick = () => closeModal(modalForm);
+  document.getElementById("btnCloseToggle").onclick = () => closeModal(modalToggle);
+  document.getElementById("btnCancelToggle").onclick = () => closeModal(modalToggle);
+  backdrop.onclick = () => {
+    modals.forEach(closeModal);
+  };
+
+  document.querySelectorAll("button[data-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.action;
+      const pk = btn.dataset.pk;
+
+      if (action === "edit") {
+        modalTitle.textContent = "编辑仓库";
+        warehouseForm.action = `/warehouses/${pk}/edit/`;
+        fCode.value = btn.dataset.code || "";
+        fName.value = btn.dataset.name || "";
+        fActive.checked = btn.dataset.active === "1";
+        fCode.readOnly = true;
+        openModal(modalForm);
+      }
+
+      if (action === "toggle") {
+        const isActiveTarget = btn.dataset.active === "1";
+        const actionLabel = isActiveTarget ? "停用" : "启用";
+        toggleForm.action = `/warehouses/${pk}/toggle/`;
+        toggleTitle.textContent = `${actionLabel}仓库`;
+        toggleMessage.textContent = `确认${actionLabel}：${btn.dataset.code} - ${btn.dataset.name}？`;
+        toggleConfirmBtn.textContent = `确认${actionLabel}`;
+        openModal(modalToggle);
+      }
+    });
+  });
+</script>
+{% endblock %}

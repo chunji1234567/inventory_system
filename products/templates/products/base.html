@@ -1,0 +1,85 @@
+{% load static %}
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}库存系统{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+</head>
+<body class="min-h-screen bg-slate-50 font-sans text-slate-900">
+  <header class="bg-slate-900 text-slate-100 shadow">
+    <nav class="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
+      <div class="text-lg font-semibold">📦 库存系统</div>
+      <div class="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-200">
+        <a class="transition hover:text-white" href="{% url 'products:inventory_dashboard' %}">库存看板</a>
+        <a class="transition hover:text-white" href="{% url 'products:warehouse_list' %}">仓库管理</a>
+        <a href="{% url 'products:item_list' %}">物品管理</a>
+        <a class="transition hover:text-white" href="{% url 'products:stockmove_list' %}">库存流水</a>
+      </div>
+    </nav>
+  </header>
+
+  {% if messages %}
+    <div id="msgBackdrop" class="fixed inset-0 z-40 hidden bg-slate-900/40"></div>
+
+    <div id="msgModal"
+      class="fixed left-1/2 top-12 z-50 hidden w-[520px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+        <strong class="text-base font-semibold text-slate-900">提示</strong>
+        <button type="button" id="msgCloseBtn"
+          class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50">
+          关闭
+        </button>
+      </div>
+      <div class="space-y-3 px-5 py-4 text-sm">
+        {% for m in messages %}
+          <div class="message rounded-2xl border px-4 py-3 {% if m.tags == 'error' %}border-red-500/70 bg-red-50 text-red-700 error{% elif m.tags == 'success' %}border-emerald-500/70 bg-emerald-50 text-emerald-700 success{% else %}border-slate-200 bg-slate-50 text-slate-700{% endif %}">
+            {{ m }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const hiddenClass = "hidden";
+        const backdrop = document.getElementById("msgBackdrop");
+        const modal = document.getElementById("msgModal");
+        const closeBtn = document.getElementById("msgCloseBtn");
+
+        if (!backdrop || !modal) return;
+
+        const hasError = modal.querySelector(".message.error") !== null;
+
+        function open() {
+          backdrop.classList.remove(hiddenClass);
+          modal.classList.remove(hiddenClass);
+        }
+
+        function close() {
+          modal.classList.add(hiddenClass);
+          backdrop.classList.add(hiddenClass);
+        }
+
+        open();
+
+        if (closeBtn) closeBtn.addEventListener("click", close);
+        backdrop.addEventListener("click", close);
+
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") close();
+        });
+
+        if (!hasError) {
+          setTimeout(close, 2000);
+        }
+      })();
+    </script>
+  {% endif %}
+
+  <main class="mx-auto w-full max-w-6xl px-5 py-8">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
