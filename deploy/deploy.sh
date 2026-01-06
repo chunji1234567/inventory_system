@@ -4,16 +4,22 @@ set -euo pipefail
 # =========================
 # 配置区：按需改这里
 # =========================
-REPO_URL="${REPO_URL:-git@github.com:chunji1234567/inventory_system.git}"   # 你的仓库地址（ssh 或 https）
-BRANCH="${BRANCH:-main}"                                                    # 分支
-APP_DIR="${APP_DIR:-/srv/inventory_system}"                                 # 部署目录
-APP_USER="${APP_USER:-chunjiwang}"                                          # 运行用户（一般就是 admin）
-APP_GROUP="${APP_GROUP:-admin}"
-SERVICE_NAME="${SERVICE_NAME:-inventory}"                                 # systemd 服务名
-BIND_ADDR="${BIND_ADDR:-127.0.0.1:8000}"                                  # gunicorn 监听地址
-DJANGO_SETTINGS="${DJANGO_SETTINGS:-config.settings}"                     # Django settings 模块
-WSGI_APP="${WSGI_APP:-config.wsgi:application}"                           # WSGI 入口
-PY_BIN="${PY_BIN:-/usr/bin/python3.11}"                                                       # Python 路径，默认自动探测
+REPO_URL="${REPO_URL:-https://github.com/chunji1234567/inventory_system.git}"  # 推荐 https；也可改 ssh
+BRANCH="${BRANCH:-main}"
+
+APP_DIR="${APP_DIR:-/srv/inventory_system}"
+
+# 默认用当前登录用户（避免 admin/chunjiwang 混乱）
+APP_USER="${APP_USER:-$(whoami)}"
+APP_GROUP="${APP_GROUP:-$(id -gn)}"
+
+SERVICE_NAME="${SERVICE_NAME:-inventory}"              # systemd 服务名
+BIND_ADDR="${BIND_ADDR:-127.0.0.1:8000}"               # gunicorn 监听地址（host:port）
+DJANGO_SETTINGS="${DJANGO_SETTINGS:-config.settings}"
+WSGI_APP="${WSGI_APP:-config.wsgi:application}"
+
+# Python 路径：优先 python3.11，否则 python3
+PY_BIN="${PY_BIN:-}"
 # =========================
 
 log(){ echo -e "\n\033[1;32m==>\033[0m $*"; }
@@ -22,15 +28,10 @@ die(){ echo -e "\n\033[1;31m[ERR]\033[0m $*"; exit 1; }
 
 need_cmd(){ command -v "$1" >/dev/null 2>&1 || die "Missing command: $1"; }
 
-is_root(){
-  [[ "${EUID}" -eq 0 ]]
-}
-
 pkg_install_yum(){
   local pkgs=("$@")
   sudo yum install -y "${pkgs[@]}"
 }
-
 pkg_install_apt(){
   local pkgs=("$@")
   sudo apt-get install -y "${pkgs[@]}"
@@ -38,62 +39,47 @@ pkg_install_apt(){
 
 detect_pkg_manager(){
   if command -v apt-get >/dev/null 2>&1; then
-    PKG_MANAGER="apt"
-    return 0
+    PKG_MANAGER="apt"; return 0
   fi
   if command -v yum >/dev/null 2>&1; then
-    PKG_MANAGER="yum"
-    return 0
+    PKG_MANAGER="yum"; return 0
   fi
   die "Unsupported OS: need apt-get or yum"
-}
-
-ensure_app_user(){
-  if id -u "${APP_USER}" >/dev/null 2>&1; then
-    return
-  fi
-  log "Create system user ${APP_USER}"
-  sudo useradd --system --create-home --shell /bin/bash "${APP_USER}"
 }
 
 ensure_basic_tools(){
   detect_pkg_manager
 
+  if [[ -z "${PY_BIN}" ]]; then
+    PY_BIN="$(command -v python3.11 || true)"
+    [[ -n "${PY_BIN}" ]] || PY_BIN="$(command -v python3 || true)"
+  fi
+  [[ -x "${PY_BIN}" ]] || die "python3 not found. Install python3 (or set PY_BIN)"
+
   if [[ "${PKG_MANAGER}" == "apt" ]]; then
     log "Update apt cache"
     sudo apt-get update -y
     log "Install base packages via apt"
-    pkg_install_apt git curl ca-certificates build-essential python3 python3-venv python3-pip libpq-dev pkg-config
+    pkg_install_apt git curl ca-certificates build-essential python3-venv python3-pip libpq-dev pkg-config
   else
     log "Install base packages via yum"
     pkg_install_yum git curl ca-certificates openssl openssl-devel \
       gcc make zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel \
       libffi-devel xz-devel python3 python3-pip postgresql-devel
   fi
-
-  if [[ -z "${PY_BIN}" ]]; then
-    PY_BIN="$(command -v python3 || true)"
-  fi
-
-  [[ -x "${PY_BIN}" ]] || die "python3 not found, install it and/or set PY_BIN"
 }
 
 install_nginx(){
-  if systemctl list-unit-files | grep -q '^nginx\.service'; then
+  if command -v nginx >/dev/null 2>&1; then
     log "nginx already installed"
-    return 0
-  fi
-
-  if [[ "${PKG_MANAGER}" == "apt" ]]; then
-    log "Install nginx via apt"
-    sudo apt-get install -y nginx
   else
-    log "Install nginx via yum"
-    if sudo yum install -y nginx --disableexcludes=all; then
-      :
+    detect_pkg_manager
+    if [[ "${PKG_MANAGER}" == "apt" ]]; then
+      log "Install nginx via apt"
+      sudo apt-get install -y nginx
     else
-      warn "nginx install failed with disableexcludes=all, try normal yum install..."
-      sudo yum install -y nginx
+      log "Install nginx via yum"
+      sudo yum install -y nginx || sudo yum install -y nginx --disableexcludes=all
     fi
   fi
 
@@ -101,31 +87,47 @@ install_nginx(){
   sudo systemctl enable --now nginx
 }
 
-clone_or_update_repo(){
+# 确保目录权限统一（避免 dubious ownership）
+prepare_app_dir(){
   log "Prepare app directory: ${APP_DIR}"
   sudo mkdir -p "${APP_DIR}"
-  sudo chown -R "${APP_USER}:${APP_GROUP}" "$(dirname "${APP_DIR}")" || true
   sudo chown -R "${APP_USER}:${APP_GROUP}" "${APP_DIR}"
+}
 
-  # Allow git to operate inside APP_DIR even if ownership differs (safe.directory)
-  sudo -u "${APP_USER}" git config --global --add safe.directory "${APP_DIR}" || true
+# Git 安全设置 + 忽略 chmod 导致的 filemode 变化
+git_safety_config(){
+  # 对当前用户生效
+  git config --global --add safe.directory "${APP_DIR}" || true
+  git config --global core.fileMode false || true
+}
+
+# 核心：部署推荐策略 = 永远对齐远端（服务器不保留 tracked 文件本地改动）
+clone_or_sync_repo(){
+  prepare_app_dir
 
   if [[ -d "${APP_DIR}/.git" ]]; then
-    log "Repo already exists, pulling latest (${BRANCH})..."
+    log "Repo exists, syncing to origin/${BRANCH} (hard reset)..."
     cd "${APP_DIR}"
-    sudo -u "${APP_USER}" git fetch --all
-    sudo -u "${APP_USER}" git checkout "${BRANCH}"
-    sudo -u "${APP_USER}" git pull origin "${BRANCH}"
+
+    # 先加 safety 配置（避免报 dubious ownership）
+    git_safety_config
+
+    # 强制对齐远端（不再被本地改动卡住）
+    git fetch origin
+    git checkout "${BRANCH}"
+    git reset --hard "origin/${BRANCH}"
+    git clean -fd
   else
     log "Cloning repo..."
-    rm -rf "${APP_DIR:?}/"*
-    sudo -u "${APP_USER}" git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
+    # 不做 rm -rf 清空，避免误删 .env/venv 等（首次部署一般是空目录）
+    git_safety_config
+    git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
+    sudo chown -R "${APP_USER}:${APP_GROUP}" "${APP_DIR}"
   fi
 }
 
 setup_venv_and_deps(){
-  log "Setup venv"
-  [[ -x "${PY_BIN}" ]] || die "Python not found at ${PY_BIN}. Set PY_BIN"
+  log "Setup venv & install deps"
   cd "${APP_DIR}"
 
   if [[ -d venv ]]; then
@@ -150,6 +152,7 @@ setup_venv_and_deps(){
 }
 
 django_prepare(){
+  log "Django prepare"
   cd "${APP_DIR}"
   # shellcheck disable=SC1091
   source venv/bin/activate
@@ -164,11 +167,6 @@ django_prepare(){
 
   log "Collect static"
   python manage.py collectstatic --noinput || die "collectstatic failed. Ensure STATIC_ROOT is set in settings.py"
-
-  log "Show DB file (if sqlite)"
-  if [[ -f db.sqlite3 ]]; then
-    ls -l db.sqlite3 || true
-  fi
 }
 
 write_systemd_service(){
@@ -183,8 +181,14 @@ Type=simple
 User=${APP_USER}
 Group=${APP_GROUP}
 WorkingDirectory=${APP_DIR}
-Environment=PATH=${APP_DIR}/venv/bin
+
+# 读取你的 .env（没有也不会报错）
+EnvironmentFile=-${APP_DIR}/.env
+
+# PATH 要完整，否则一些命令找不到
+Environment="PATH=${APP_DIR}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment=DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS}
+
 ExecStart=${APP_DIR}/venv/bin/gunicorn --workers 3 --bind ${BIND_ADDR} ${WSGI_APP}
 Restart=always
 RestartSec=5
@@ -204,12 +208,12 @@ write_nginx_conf(){
   log "Write nginx reverse proxy config"
   sudo mkdir -p /etc/nginx/conf.d
 
-  # 先备份可能存在的 default 配置（有些系统默认页在别处，这里只处理 conf.d）
-  if [[ -f /etc/nginx/conf.d/default.conf ]]; then
-    sudo mv /etc/nginx/conf.d/default.conf "/etc/nginx/conf.d/default.conf.bak.$(date +%s)"
-  fi
-
+  # 用 upstream 更稳（未来你改 unix socket 也好扩展）
   sudo tee /etc/nginx/conf.d/inventory.conf >/dev/null <<EOF
+upstream inventory_app {
+    server ${BIND_ADDR};
+}
+
 server {
     listen 80;
     server_name _;
@@ -223,7 +227,7 @@ server {
     }
 
     location / {
-        proxy_pass http://${BIND_ADDR};
+        proxy_pass http://inventory_app;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -239,24 +243,26 @@ EOF
 self_check(){
   log "Self-check (local)"
   curl -I "http://127.0.0.1" || true
-  curl -I "http://127.0.0.1/static/admin/css/base.css" || true
 
   echo
   echo "✅ Deploy finished."
   echo "Next steps:"
-  echo "1) Ensure ALLOWED_HOSTS includes your public IP/domain in config/settings.py"
+  echo "1) Ensure ALLOWED_HOSTS includes your public IP/domain (in settings or .env)"
   echo "2) Open Security Group inbound TCP 80 (and 443 if HTTPS)"
-  echo "3) Visit: http://<PublicIP>/  (or your route like /inventory/)"
+  echo "3) Visit: http://<PublicIP>/"
 }
 
 main(){
   need_cmd sudo
-  ensure_basic_tools
-  ensure_app_user
-  need_cmd git
   need_cmd curl
+
+  ensure_basic_tools
+  need_cmd git
+
   install_nginx
-  clone_or_update_repo
+
+  # 统一用当前用户执行脚本（避免 sudo -u 混乱）；目录 owner 也统一
+  clone_or_sync_repo
   setup_venv_and_deps
   django_prepare
   write_systemd_service
