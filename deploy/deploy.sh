@@ -68,7 +68,7 @@ ensure_basic_tools(){
     log "Install base packages via yum"
     pkg_install_yum git curl ca-certificates openssl openssl-devel \
       gcc make zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel \
-      libffi-devel xz-devel python3 python3-venv python3-pip postgresql-devel
+      libffi-devel xz-devel python3 python3-pip postgresql-devel
   fi
 
   if [[ -z "${PY_BIN}" ]]; then
