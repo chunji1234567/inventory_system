@@ -4,12 +4,9 @@ set -euo pipefail
 # =========================
 # 配置区：按需改这里
 # =========================
-REPO_URL="${REPO_URL:-https://github.com/chunji1234567/inventory_system.git}"  # 推荐 https；也可改 ssh
-BRANCH="${BRANCH:-main}"
-
 APP_DIR="${APP_DIR:-/srv/inventory_system}"
 
-# 默认用当前登录用户（避免 admin/chunjiwang 混乱）
+# 默认用当前登录用户（避免权限混乱）
 APP_USER="${APP_USER:-$(whoami)}"
 APP_GROUP="${APP_GROUP:-$(id -gn)}"
 
@@ -47,23 +44,26 @@ detect_pkg_manager(){
   die "Unsupported OS: need apt-get or yum"
 }
 
-ensure_basic_tools(){
-  detect_pkg_manager
-
+ensure_python(){
   if [[ -z "${PY_BIN}" ]]; then
     PY_BIN="$(command -v python3.11 || true)"
     [[ -n "${PY_BIN}" ]] || PY_BIN="$(command -v python3 || true)"
   fi
   [[ -x "${PY_BIN}" ]] || die "python3 not found. Install python3 (or set PY_BIN)"
+}
+
+ensure_basic_tools(){
+  detect_pkg_manager
+  ensure_python
 
   if [[ "${PKG_MANAGER}" == "apt" ]]; then
     log "Update apt cache"
     sudo apt-get update -y
     log "Install base packages via apt"
-    pkg_install_apt git curl ca-certificates build-essential python3-venv python3-pip libpq-dev pkg-config
+    pkg_install_apt curl ca-certificates build-essential python3-venv python3-pip libpq-dev pkg-config
   else
     log "Install base packages via yum"
-    pkg_install_yum git curl ca-certificates openssl openssl-devel \
+    pkg_install_yum curl ca-certificates openssl openssl-devel \
       gcc make zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel \
       libffi-devel xz-devel python3 python3-pip postgresql-devel
   fi
@@ -87,43 +87,15 @@ install_nginx(){
   sudo systemctl enable --now nginx
 }
 
-# 确保目录权限统一（避免 dubious ownership）
 prepare_app_dir(){
   log "Prepare app directory: ${APP_DIR}"
-  sudo mkdir -p "${APP_DIR}"
-  sudo chown -R "${APP_USER}:${APP_GROUP}" "${APP_DIR}"
+  [[ -d "${APP_DIR}" ]] || die "APP_DIR not found: ${APP_DIR}. Upload/copy your code there first."
+  sudo chown -R "${APP_USER}:${APP_GROUP}" "${APP_DIR}" || true
 }
 
-# Git 安全设置 + 忽略 chmod 导致的 filemode 变化
-git_safety_config(){
-  # 对当前用户生效
-  git config --global --add safe.directory "${APP_DIR}" || true
-  git config --global core.fileMode false || true
-}
-
-# 核心：部署推荐策略 = 永远对齐远端（服务器不保留 tracked 文件本地改动）
-clone_or_sync_repo(){
-  prepare_app_dir
-
-  if [[ -d "${APP_DIR}/.git" ]]; then
-    log "Repo exists, syncing to origin/${BRANCH} (hard reset)..."
-    cd "${APP_DIR}"
-
-    # 先加 safety 配置（避免报 dubious ownership）
-    git_safety_config
-
-    # 强制对齐远端（不再被本地改动卡住）
-    git fetch origin
-    git checkout "${BRANCH}"
-    git reset --hard "origin/${BRANCH}"
-    git clean -fd
-  else
-    log "Cloning repo..."
-    # 不做 rm -rf 清空，避免误删 .env/venv 等（首次部署一般是空目录）
-    git_safety_config
-    git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
-    sudo chown -R "${APP_USER}:${APP_GROUP}" "${APP_DIR}"
-  fi
+ensure_app_code_present(){
+  log "Check app code exists in ${APP_DIR}"
+  [[ -f "${APP_DIR}/manage.py" ]] || die "manage.py not found in ${APP_DIR}. This script assumes code is already present."
 }
 
 setup_venv_and_deps(){
@@ -185,7 +157,6 @@ WorkingDirectory=${APP_DIR}
 # 读取你的 .env（没有也不会报错）
 EnvironmentFile=-${APP_DIR}/.env
 
-# PATH 要完整，否则一些命令找不到
 Environment="PATH=${APP_DIR}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment=DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS}
 
@@ -208,7 +179,6 @@ write_nginx_conf(){
   log "Write nginx reverse proxy config"
   sudo mkdir -p /etc/nginx/conf.d
 
-  # 用 upstream 更稳（未来你改 unix socket 也好扩展）
   sudo tee /etc/nginx/conf.d/inventory.conf >/dev/null <<EOF
 upstream inventory_app {
     server ${BIND_ADDR};
@@ -257,12 +227,11 @@ main(){
   need_cmd curl
 
   ensure_basic_tools
-  need_cmd git
-
   install_nginx
 
-  # 统一用当前用户执行脚本（避免 sudo -u 混乱）；目录 owner 也统一
-  clone_or_sync_repo
+  prepare_app_dir
+  ensure_app_code_present
+
   setup_venv_and_deps
   django_prepare
   write_systemd_service
