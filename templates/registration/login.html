@@ -6,7 +6,7 @@
   <h1 class="text-2xl font-semibold text-slate-900">登录系统</h1>
   <p class="mt-1 text-sm text-slate-500">请输入账号密码，只有授权用户可访问库存数据。</p>
 
-  <form method="post" class="mt-6 space-y-4">
+  <form method="post" action="{% url 'login' %}" class="mt-6 space-y-4">
     {% csrf_token %}
     {% if next %}
       <input type="hidden" name="next" value="{{ next }}">
