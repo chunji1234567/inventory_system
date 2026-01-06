@@ -17,6 +17,11 @@ WSGI_APP="${WSGI_APP:-config.wsgi:application}"
 
 # Python 路径：优先 python3.11，否则 python3
 PY_BIN="${PY_BIN:-}"
+
+PIP_TIMEOUT="${PIP_TIMEOUT:-60}"
+PIP_RETRIES="${PIP_RETRIES:-10}"
+PIP_INDEX_URL="${PIP_INDEX_URL:-}"   # 可选：例如 https://pypi.org/simple 或国内镜像
+
 # =========================
 
 log(){ echo -e "\n\033[1;32m==>\033[0m $*"; }
@@ -110,18 +115,29 @@ setup_venv_and_deps(){
 
   # shellcheck disable=SC1091
   source venv/bin/activate
+  python -m pip config set global.timeout "${PIP_TIMEOUT}" >/dev/null 2>&1 || true
+  python -m pip config set global.retries "${PIP_RETRIES}" >/dev/null 2>&1 || true
+
+
+  # 一律用 python -m pip，避免 pip 命令不在 PATH
+  local PIP_ARGS=("--timeout" "${PIP_TIMEOUT}" "--retries" "${PIP_RETRIES}")
+  if [[ -n "${PIP_INDEX_URL}" ]]; then
+    log "Using PIP_INDEX_URL=${PIP_INDEX_URL}"
+    PIP_ARGS+=("-i" "${PIP_INDEX_URL}")
+  fi
 
   log "Upgrade pip"
-  pip install -U pip wheel setuptools
+  python -m pip install -U pip setuptools wheel "${PIP_ARGS[@]}"
 
   if [[ -f requirements.txt ]]; then
     log "Install backend dependencies from requirements.txt"
-    pip install -r requirements.txt
+    python -m pip install -r requirements.txt "${PIP_ARGS[@]}"
   else
     warn "requirements.txt not found. Install minimal deps: django + gunicorn"
-    pip install "django>=4.2,<5.0" gunicorn
+    python -m pip install "django>=4.2,<5.0" gunicorn "${PIP_ARGS[@]}"
   fi
 }
+
 
 django_prepare(){
   log "Django prepare"
