@@ -46,6 +46,7 @@ class Item(models.Model):
     )
 
     is_active = models.BooleanField(default=True, verbose_name="是否启用")
+    is_finished_good = models.BooleanField(default=False, verbose_name="是否为成品")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

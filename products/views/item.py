@@ -29,6 +29,7 @@ def item_create(request):
     name = (request.POST.get("name") or "").strip()
     unit = (request.POST.get("unit") or "").strip()
     warehouse_id = (request.POST.get("warehouse_id") or "").strip()
+    is_finished_good = request.POST.get("is_finished_good") == "on"
 
     if not name or not unit or not warehouse_id:
         messages.error(request, "新增失败：名称 / 单位 / 仓库不能为空")
@@ -48,6 +49,7 @@ def item_create(request):
         unit=unit,
         warehouse=warehouse,
         is_active=True,
+        is_finished_good=is_finished_good,
     )
     messages.success(request, "物品已新增")
     return redirect(reverse("products:item_list"))
@@ -64,6 +66,7 @@ def item_update(request, pk: int):
     unit = (request.POST.get("unit") or "").strip()
     warehouse_id = (request.POST.get("warehouse_id") or "").strip()
     is_active = request.POST.get("is_active") == "on"
+    is_finished_good = request.POST.get("is_finished_good") == "on"
 
     if not name or not unit or not warehouse_id:
         messages.error(request, "更新失败：名称 / 单位 / 仓库不能为空")
@@ -82,7 +85,8 @@ def item_update(request, pk: int):
     item.unit = unit
     item.warehouse = warehouse
     item.is_active = is_active
-    item.save(update_fields=["name", "unit", "warehouse", "is_active"])
+    item.is_finished_good = is_finished_good
+    item.save(update_fields=["name", "unit", "warehouse", "is_active", "is_finished_good"])
 
     messages.success(request, "物品已更新")
     return redirect(reverse("products:item_list"))

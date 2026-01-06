@@ -21,6 +21,7 @@
         <th class="px-4 py-3 text-left">名称</th>
         <th class="px-4 py-3 text-left">仓库</th>
         <th class="px-4 py-3 text-left">单位</th>
+        <th class="px-4 py-3 text-left">成品</th>
         <th class="px-4 py-3 text-left">状态</th>
         <th class="px-4 py-3 text-left">操作</th>
       </tr>
@@ -38,6 +39,13 @@
           </td>
           <td class="px-4 py-3 text-slate-500">{{ it.get_unit_display }}</td>
           <td class="px-4 py-3">
+            {% if it.is_finished_good %}
+              <span class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200">是</span>
+            {% else %}
+              <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">否</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3">
             {% if it.is_active %}
               <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">启用</span>
             {% else %}
@@ -53,6 +61,7 @@
                 data-name="{{ it.name }}"
                 data-unit="{{ it.unit }}"
                 data-active="{{ it.is_active|yesno:'1,0' }}"
+                data-finished="{{ it.is_finished_good|yesno:'1,0' }}"
                 data-warehouse="{{ it.warehouse_id }}">
                 编辑
               </button>
@@ -114,6 +123,10 @@
         <input id="fActive" type="checkbox" name="is_active" class="rounded border-slate-300">
         启用
       </label>
+      <label class="flex items-center gap-2 text-sm">
+        <input id="fFinished" type="checkbox" name="is_finished_good" class="rounded border-slate-300">
+        成品
+      </label>
     </div>
     <div class="flex justify-end gap-3 border-t px-5 py-3">
       <button type="button" onclick="closeAll()" class="rounded-xl border px-4 py-2 text-sm">取消</button>
@@ -132,6 +145,7 @@
   const fUnit = document.getElementById("fUnit");
   const fWarehouse = document.getElementById("fWarehouse");
   const fActive = document.getElementById("fActive");
+  const fFinished = document.getElementById("fFinished");
 
   function openModal() {
     backdrop.classList.remove("hidden");
@@ -152,6 +166,7 @@
       fWarehouse.selectedIndex = 0;
     }
     fActive.checked = true;
+    fFinished.checked = false;
     openModal();
   };
 
@@ -163,6 +178,7 @@
       fUnit.value = btn.dataset.unit;
       fWarehouse.value = btn.dataset.warehouse || "";
       fActive.checked = (btn.dataset.active === "1");
+      fFinished.checked = (btn.dataset.finished === "1");
       openModal();
     };
   });

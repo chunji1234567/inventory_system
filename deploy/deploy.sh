@@ -5,15 +5,15 @@ set -euo pipefail
 # 配置区：按需改这里
 # =========================
 REPO_URL="${REPO_URL:-git@github.com:chunji1234567/inventory_system.git}"   # 你的仓库地址（ssh 或 https）
-BRANCH="${BRANCH:-main}"                                                  # 分支
-APP_DIR="${APP_DIR:-/srv/inventory_system}"                               # 部署目录
-APP_USER="${APP_USER:-admin}"                                             # 运行用户（一般就是 admin）
+BRANCH="${BRANCH:-main}"                                                    # 分支
+APP_DIR="${APP_DIR:-/srv/inventory_system}"                                 # 部署目录
+APP_USER="${APP_USER:-chunjiwang}"                                          # 运行用户（一般就是 admin）
 APP_GROUP="${APP_GROUP:-admin}"
 SERVICE_NAME="${SERVICE_NAME:-inventory}"                                 # systemd 服务名
 BIND_ADDR="${BIND_ADDR:-127.0.0.1:8000}"                                  # gunicorn 监听地址
 DJANGO_SETTINGS="${DJANGO_SETTINGS:-config.settings}"                     # Django settings 模块
 WSGI_APP="${WSGI_APP:-config.wsgi:application}"                           # WSGI 入口
-PY_BIN="${PY_BIN:-/usr/local/bin/python3.10}"                             # Python 路径（你已装好 3.10.13）
+PY_BIN="${PY_BIN:-}"                                                       # Python 路径，默认自动探测
 # =========================
 
 log(){ echo -e "\n\033[1;32m==>\033[0m $*"; }
@@ -31,13 +31,51 @@ pkg_install_yum(){
   sudo yum install -y "${pkgs[@]}"
 }
 
-ensure_basic_tools(){
-  log "Install base packages (git, curl, gcc, python build deps if needed)..."
-  pkg_install_yum git curl ca-certificates openssl openssl-devel \
-    gcc make zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel \
-    libffi-devel xz-devel
+pkg_install_apt(){
+  local pkgs=("$@")
+  sudo apt-get install -y "${pkgs[@]}"
+}
 
-  # ensure pip/venv available via compiled python; system python packages not required
+detect_pkg_manager(){
+  if command -v apt-get >/dev/null 2>&1; then
+    PKG_MANAGER="apt"
+    return 0
+  fi
+  if command -v yum >/dev/null 2>&1; then
+    PKG_MANAGER="yum"
+    return 0
+  fi
+  die "Unsupported OS: need apt-get or yum"
+}
+
+ensure_app_user(){
+  if id -u "${APP_USER}" >/dev/null 2>&1; then
+    return
+  fi
+  log "Create system user ${APP_USER}"
+  sudo useradd --system --create-home --shell /bin/bash "${APP_USER}"
+}
+
+ensure_basic_tools(){
+  detect_pkg_manager
+
+  if [[ "${PKG_MANAGER}" == "apt" ]]; then
+    log "Update apt cache"
+    sudo apt-get update -y
+    log "Install base packages via apt"
+    pkg_install_apt git curl ca-certificates build-essential python3 python3-venv python3-pip libpq-dev pkg-config
+  else
+    log "Install base packages via yum"
+    pkg_install_yum git curl ca-certificates openssl openssl-devel \
+      gcc make zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel \
+      libffi-devel xz-devel python3 python3-venv python3-pip postgresql-devel
+  fi
+
+  if [[ -z "${PY_BIN}" ]]; then
+    PY_BIN="$(command -v python3 || true)"
+  fi
+
+  [[ -x "${PY_BIN}" ]] || die "python3 not found, install it and/or set PY_BIN"
 }
 
 install_nginx(){
@@ -46,12 +84,17 @@ install_nginx(){
     return 0
   fi
 
-  log "Install nginx (may be excluded by yum policy, try disableexcludes)..."
-  if sudo yum install -y nginx --disableexcludes=all; then
-    :
+  if [[ "${PKG_MANAGER}" == "apt" ]]; then
+    log "Install nginx via apt"
+    sudo apt-get install -y nginx
   else
-    warn "nginx install failed with disableexcludes=all, try normal yum install..."
-    sudo yum install -y nginx
+    log "Install nginx via yum"
+    if sudo yum install -y nginx --disableexcludes=all; then
+      :
+    else
+      warn "nginx install failed with disableexcludes=all, try normal yum install..."
+      sudo yum install -y nginx
+    fi
   fi
 
   log "Enable & start nginx"
@@ -79,7 +122,7 @@ clone_or_update_repo(){
 
 setup_venv_and_deps(){
   log "Setup venv"
-  [[ -x "${PY_BIN}" ]] || die "Python not found at ${PY_BIN}. Set PY_BIN or install python3.10."
+  [[ -x "${PY_BIN}" ]] || die "Python not found at ${PY_BIN}. Set PY_BIN"
   cd "${APP_DIR}"
 
   if [[ -d venv ]]; then
@@ -205,10 +248,10 @@ self_check(){
 
 main(){
   need_cmd sudo
+  ensure_basic_tools
+  ensure_app_user
   need_cmd git
   need_cmd curl
-
-  ensure_basic_tools
   install_nginx
   clone_or_update_repo
   setup_venv_and_deps

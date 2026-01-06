@@ -60,7 +60,7 @@ def inventory_dashboard(request):
             "on_hand": quantity,
             "updated_at": balance.updated_at if balance else None,
             "has_stock": quantity > 0,
-            "is_low_stock": quantity < threshold,
+            "is_low_stock": (not item.is_finished_good) and quantity < threshold,
         }
         grouped[group_key]["rows"].append(row_data)
 

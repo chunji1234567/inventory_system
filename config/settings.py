@@ -191,15 +191,15 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "inventory_db"),
-        "USER": os.getenv("DB_USER", "inventory_user"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+        "NAME": _env_value("POSTGRES_DB", "inventory_db"),
+        "USER": _env_value("POSTGRES_USER", "inventory_user"),
+        "PASSWORD": _env_value("POSTGRES_PASSWORD", "inventory_pass"),
+        "HOST": _env_value("POSTGRES_HOST", "127.0.0.1"),
+        "PORT": _env_value("POSTGRES_PORT", "5432"),
+        "CONN_MAX_AGE": int(os.getenv("POSTGRES_CONN_MAX_AGE", "60")),
     }
 }
-
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 
 def _database_from_url(url: str) -> dict:
@@ -252,8 +252,6 @@ def _database_from_url(url: str) -> dict:
 
     return config
 
-
-DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 if DATABASE_URL:
     DATABASES["default"] = _database_from_url(DATABASE_URL)
