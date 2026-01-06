@@ -107,16 +107,19 @@ clone_or_update_repo(){
   sudo chown -R "${APP_USER}:${APP_GROUP}" "$(dirname "${APP_DIR}")" || true
   sudo chown -R "${APP_USER}:${APP_GROUP}" "${APP_DIR}"
 
+  # Allow git to operate inside APP_DIR even if ownership differs (safe.directory)
+  sudo -u "${APP_USER}" git config --global --add safe.directory "${APP_DIR}" || true
+
   if [[ -d "${APP_DIR}/.git" ]]; then
     log "Repo already exists, pulling latest (${BRANCH})..."
     cd "${APP_DIR}"
-    git fetch --all
-    git checkout "${BRANCH}"
-    git pull origin "${BRANCH}"
+    sudo -u "${APP_USER}" git fetch --all
+    sudo -u "${APP_USER}" git checkout "${BRANCH}"
+    sudo -u "${APP_USER}" git pull origin "${BRANCH}"
   else
     log "Cloning repo..."
     rm -rf "${APP_DIR:?}/"*
-    git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
+    sudo -u "${APP_USER}" git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
   fi
 }
 
