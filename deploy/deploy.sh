@@ -13,7 +13,7 @@ SERVICE_NAME="${SERVICE_NAME:-inventory}"                                 # syst
 BIND_ADDR="${BIND_ADDR:-127.0.0.1:8000}"                                  # gunicorn 监听地址
 DJANGO_SETTINGS="${DJANGO_SETTINGS:-config.settings}"                     # Django settings 模块
 WSGI_APP="${WSGI_APP:-config.wsgi:application}"                           # WSGI 入口
-PY_BIN="${PY_BIN:"/usr/bin/python3.11"}"                                                       # Python 路径，默认自动探测
+PY_BIN="${PY_BIN:-/usr/bin/python3.11}"                                                       # Python 路径，默认自动探测
 # =========================
 
 log(){ echo -e "\n\033[1;32m==>\033[0m $*"; }
