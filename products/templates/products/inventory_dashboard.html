@@ -160,8 +160,9 @@
 <div id="modalInbound"
   class="fixed left-1/2 top-10 z-40 hidden w-[560px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
   <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">入库</div>
-  <form method="post" action="{% url 'products:inventory_inbound' %}" class="space-y-0">
+  <form method="post" action="{% url 'products:inventory_inbound' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
+    <input type="hidden" name="form_token" value="{{ form_tokens.inbound }}">
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
         仓库
@@ -201,8 +202,9 @@
 <div id="modalOutbound"
   class="fixed left-1/2 top-10 z-40 hidden w-[560px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
   <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">出库</div>
-  <form method="post" action="{% url 'products:inventory_outbound' %}" class="space-y-0">
+  <form method="post" action="{% url 'products:inventory_outbound' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
+    <input type="hidden" name="form_token" value="{{ form_tokens.outbound }}">
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
         仓库
@@ -243,8 +245,9 @@
 <div id="modalAdjust"
   class="fixed left-1/2 top-10 z-40 hidden w-[600px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
   <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">库存调整</div>
-  <form method="post" action="{% url 'products:inventory_adjust' %}" class="space-y-0">
+  <form method="post" action="{% url 'products:inventory_adjust' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
+    <input type="hidden" name="form_token" value="{{ form_tokens.adjust }}">
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
         仓库

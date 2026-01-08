@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import uuid
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -6,6 +7,12 @@ from django.db.models import Q
 from django.shortcuts import render
 
 from products.models import Warehouse, StockBalance, Item
+
+
+def _issue_form_token(request, key: str) -> str:
+    token = uuid.uuid4().hex
+    request.session[f"form_token_{key}"] = token
+    return token
 
 
 @login_required
@@ -76,6 +83,12 @@ def inventory_dashboard(request):
         key=lambda grp: (grp["warehouse"].name if grp["warehouse"] else "")
     )
 
+    form_tokens = {
+        "inbound": _issue_form_token(request, "inbound"),
+        "outbound": _issue_form_token(request, "outbound"),
+        "adjust": _issue_form_token(request, "adjust"),
+    }
+
     return render(request, "products/inventory_dashboard.html", {
         "grouped_rows": grouped_rows,
         "warehouses": warehouses,
@@ -86,4 +99,5 @@ def inventory_dashboard(request):
         "balance_data": balance_data,
         "low_stock_threshold": threshold,
         "low_stock_rows": low_stock_rows,
+        "form_tokens": form_tokens,
     })

@@ -7,9 +7,23 @@ from django.urls import reverse
 from products.models import Warehouse, Item, StockMove, StockBalance, MoveType
 
 
+def _verify_form_token(request, key: str) -> bool:
+    token = (request.POST.get("form_token") or "").strip()
+    session_key = f"form_token_{key}"
+    expected = request.session.get(session_key)
+    if not token or not expected or token != expected:
+        return False
+    request.session.pop(session_key, None)
+    return True
+
+
 @login_required
 def inbound_create(request):
     if request.method != "POST":
+        return redirect(reverse("products:inventory_dashboard"))
+
+    if not _verify_form_token(request, "inbound"):
+        messages.error(request, "请勿重复提交入库请求")
         return redirect(reverse("products:inventory_dashboard"))
 
     warehouse_id = request.POST.get("warehouse_id")
@@ -48,6 +62,10 @@ def inbound_create(request):
 @login_required
 def outbound_create(request):
     if request.method != "POST":
+        return redirect(reverse("products:inventory_dashboard"))
+
+    if not _verify_form_token(request, "outbound"):
+        messages.error(request, "请勿重复提交出库请求")
         return redirect(reverse("products:inventory_dashboard"))
 
     warehouse_id = request.POST.get("warehouse_id")
@@ -99,6 +117,10 @@ def outbound_create(request):
 @login_required
 def adjust_create(request):
     if request.method != "POST":
+        return redirect(reverse("products:inventory_dashboard"))
+
+    if not _verify_form_token(request, "adjust"):
+        messages.error(request, "请勿重复提交库存调整")
         return redirect(reverse("products:inventory_dashboard"))
 
     warehouse_id = request.POST.get("warehouse_id")

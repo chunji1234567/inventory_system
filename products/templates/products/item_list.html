@@ -95,7 +95,7 @@
   class="fixed left-1/2 top-10 z-40 hidden w-[520px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
   <div id="modalTitle" class="border-b px-5 py-3 font-semibold">新增物品</div>
 
-  <form id="itemForm" method="post">
+  <form id="itemForm" method="post" data-prevent-double-submit="true">
     {% csrf_token %}
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium">名称
