@@ -2,20 +2,34 @@
 {% block title %}库存看板{% endblock %}
 
 {% block content %}
+
+<!-- {# =========================
+  Header / Actions
+========================= #} -->
 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
   <div class="space-y-1">
     <h1 class="text-2xl font-semibold text-slate-900">库存预览</h1>
   </div>
+
   <div class="flex flex-wrap gap-2">
-    <button type="button"
-      onclick="openLowStockModal(true)"
-      class="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-100">
-      手动查看低库存
+    <button id="btnNewItem" type="button"
+      class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      + 新增物品
+    </button>
+
+    <button type="button" id="btnLowStock"
+      class="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200">
+      查看低库存
     </button>
   </div>
 </div>
 
-<form id="inventoryFilterForm" class="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" method="get">
+<!-- {# =========================
+  Filter
+========================= #} -->
+<form id="inventoryFilterForm"
+  class="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+  method="get">
   <label class="flex flex-1 min-w-[180px] flex-col gap-1 text-sm font-medium text-slate-600">
     <span>仓库</span>
     <select name="warehouse_id"
@@ -28,20 +42,32 @@
       {% endfor %}
     </select>
   </label>
-  <label class="flex flex-1 min-w-[200px] flex-col gap-1 text-sm font-medium text-slate-600">
+
+  <label class="flex flex-1 min-w-[220px] flex-col gap-1 text-sm font-medium text-slate-600">
     <span>搜索</span>
     <input type="text" name="q" placeholder="搜索物品/仓库名称" value="{{ q|default:'' }}"
       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 shadow-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
   </label>
+
   <label class="flex items-center gap-2 text-sm font-medium text-slate-600">
     <input type="checkbox" name="show_inactive" value="1" {% if show_inactive %}checked{% endif %}
       class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500" />
     显示停用物品
   </label>
-  <a class="inline-flex items-center rounded-xl border border-transparent bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
-    href="{% url 'products:inventory_dashboard' %}">重置</a>
+
+  <div class="flex items-center gap-2">
+    <button type="submit"
+      class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
+      筛选
+    </button>
+    <a class="inline-flex items-center rounded-xl border border-transparent bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-200"
+      href="{% url 'products:inventory_dashboard' %}">重置</a>
+  </div>
 </form>
 
+<!-- {# =========================
+  Inventory Table (single container)
+========================= #} -->
 {% if grouped_rows %}
   {% for group in grouped_rows %}
     <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -57,60 +83,105 @@
           <p class="text-xs text-slate-500">{{ group.rows|length }} 个物品</p>
         </div>
       </div>
+
       <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>
             <th class="px-4 py-3 w-1/3">物品</th>
-            <th class="px-4 py-3 text-right w-28">库存</th>
+            <th class="px-4 py-3 text-right w-32">库存</th>
             <th class="px-4 py-3 w-1/4">更新时间</th>
-            <th class="px-4 py-3 w-44">操作</th>
+            <th class="px-4 py-3 w-[420px]">操作</th>
           </tr>
         </thead>
+
         <tbody class="divide-y divide-slate-100 bg-white text-slate-800">
           {% for row in group.rows %}
             {% with item=row.item %}
-            <tr class="transition hover:bg-slate-50/70 {% if row.is_low_stock %}bg-red-50/70{% endif %}">
+            <tr class="transition hover:bg-slate-50/70 {% if row.is_low_stock %}bg-red-50/60{% endif %}">
               <td class="px-4 py-3">
-                {{ item.name }}
-                {% if item.is_finished_good %}
-                  <span class="ml-2 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">成品</span>
-                {% endif %}
+                <div class="flex items-center gap-2">
+                  <div class="font-medium text-slate-900">{{ item.name }}</div>
+                  {% if not item.is_active %}
+                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">停用</span>
+                  {% endif %}
+                  {% if row.is_low_stock %}
+                    <span class="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 ring-1 ring-red-200">低库存</span>
+                  {% endif %}
+                </div>
               </td>
+
               <td class="px-4 py-3 text-right font-semibold text-slate-900">
                 <span class="inline-block w-24 text-right tabular-nums">{{ row.on_hand }}</span>
-                <span class="ml-1 text-xs font-normal text-slate-500 whitespace-nowrap">{{ item.get_unit_display }}</span>
-                {% if row.is_low_stock %}
-                  <span class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-700">
-                    低库存
-                  </span>
-                {% endif %}
+                <span class="ml-1 text-xs font-normal text-slate-500 whitespace-nowrap">{{ item.unit.name }}</span>
               </td>
+
               <td class="px-4 py-3 text-slate-500">
                 {{ row.updated_at|default:item.created_at|date:"Y-m-d H:i" }}
               </td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <div class="flex flex-wrap gap-2">
-                  {% if group.warehouse %}
+
+              <td class="px-4 py-3">
+                {% if group.warehouse %}
+                  <div class="flex flex-wrap items-center gap-2">
+
+                    {# 入库（主操作） #}
                     <button type="button"
-                      class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
-                      onclick="openInboundWith('{{ group.warehouse.id }}','{{ item.id }}')">
+                      class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                      data-open="inbound"
+                      data-warehouse="{{ group.warehouse.id }}"
+                      data-item="{{ item.id }}">
                       入库
                     </button>
+
+                    {# 调整（次操作，偏管理） #}
                     <button type="button"
-                      class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-                      {% if not row.has_stock %}disabled{% endif %}
-                      onclick="openOutboundWith('{{ group.warehouse.id }}','{{ item.id }}')">
-                      出库
-                    </button>
-                    <button type="button"
-                      class="inline-flex items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 shadow-sm transition hover:bg-amber-100"
-                      onclick="openAdjustWith('{{ group.warehouse.id }}','{{ item.id }}')">
+                      class="inline-flex items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 shadow-sm transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                      data-open="adjust"
+                      data-warehouse="{{ group.warehouse.id }}"
+                      data-item="{{ item.id }}">
                       调整
                     </button>
-                  {% else %}
-                    <span class="text-xs text-slate-400">未分配仓库，无法操作</span>
-                  {% endif %}
-                </div>
+
+                    {# 出库（危险操作 + 库存为0禁用） #}
+                    <button type="button"
+                      class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      {% if not row.has_stock %}disabled{% endif %}
+                      data-open="outbound"
+                      data-warehouse="{{ group.warehouse.id }}"
+                      data-item="{{ item.id }}">
+                      出库
+                    </button>
+
+                    {# 编辑（中性） #}
+                    <button type="button"
+                      class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                      data-open="item"
+                      data-mode="edit"
+                      data-id="{{ item.id }}"
+                      data-name="{{ item.name }}"
+                      data-unit="{{ item.unit_id }}"
+                      data-warehouse="{{ item.warehouse_id }}"
+                      data-active="{{ item.is_active|yesno:'1,0' }}">
+                      编辑
+                    </button>
+
+                    {# 启用/停用（危险/恢复） #}
+                    <form method="post" action="{% url 'products:item_toggle_active' item.id %}" data-prevent-double-submit="true">
+                      {% csrf_token %}
+                      <button type="submit"
+                        class="inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2
+                        {% if item.is_active %}
+                          border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200
+                        {% else %}
+                          border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 focus:ring-emerald-200
+                        {% endif %}">
+                        {{ item.is_active|yesno:"停用,启用" }}
+                      </button>
+                    </form>
+
+                  </div>
+                {% else %}
+                  <span class="text-xs text-slate-400">未分配仓库，无法操作</span>
+                {% endif %}
               </td>
             </tr>
             {% endwith %}
@@ -125,17 +196,36 @@
   {% endfor %}
 {% else %}
   <div class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-6 text-center text-sm text-slate-500">
-    暂无符合条件的物品，请在“物品管理”中新增
+    暂无符合条件的物品，请先新增物品
   </div>
 {% endif %}
 
+<!-- {# =========================
+  Data for JS
+========================= #} -->
 {{ balance_data|json_script:"balance-data" }}
 
+<!-- {# =========================
+  Backdrop
+========================= #} -->
+<div id="backdrop" class="fixed inset-0 z-30 hidden bg-slate-900/40"></div>
+
+<!-- {# =========================
+  Low Stock Modal
+========================= #} -->
 <div id="lowStockModal" data-low-stock-count="{{ low_stock_rows|length }}"
   class="fixed left-1/2 top-10 z-40 hidden w-[520px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
-  <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">库存预警</div>
+  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <div class="text-base font-semibold text-slate-900">库存预警</div>
+    <button type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+      data-close>
+      关闭
+    </button>
+  </div>
+
   <div class="space-y-4 px-5 py-4 text-sm text-slate-700">
     <p>以下物品库存低于安全阈值（{{ low_stock_threshold }}）。请及时补货或调整。</p>
+
     <ul class="max-h-64 space-y-2 overflow-y-auto pr-1 text-sm">
       {% for low in low_stock_rows %}
         <li class="flex flex-col rounded-xl border border-red-100 bg-red-50/70 px-3 py-2 text-red-800">
@@ -147,22 +237,28 @@
       {% endfor %}
     </ul>
   </div>
+
   <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
     <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
-      type="button" onclick="closeAll()">稍后处理</button>
-    <button class="inline-flex items-center rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-red-600/30 transition hover:bg-red-500"
-      type="button" onclick="closeAll()">知道了</button>
+      type="button" data-close>知道了</button>
   </div>
 </div>
 
-<div id="backdrop" class="fixed inset-0 z-30 hidden bg-slate-900/40"></div>
-
+<!-- {# =========================
+  Inbound Modal
+========================= #} -->
 <div id="modalInbound"
   class="fixed left-1/2 top-10 z-40 hidden w-[560px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
-  <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">入库</div>
+  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <div class="text-base font-semibold text-slate-900">入库</div>
+    <button type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+      data-close>关闭</button>
+  </div>
+
   <form method="post" action="{% url 'products:inventory_inbound' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
     <input type="hidden" name="form_token" value="{{ form_tokens.inbound }}">
+
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
         仓库
@@ -174,37 +270,61 @@
           {% endfor %}
         </select>
       </label>
+
       <label class="block text-sm font-medium text-slate-700">
         物品
         <select id="inItem" name="item_id" required
           class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
           <option value="">请选择</option>
           {% for it in form_items %}
-            <option value="{{ it.id }}" data-unit-label="{{ it.get_unit_display }}">{{ it.name }}</option>
+            <option value="{{ it.id }}" data-unit-label="{{ it.unit.name }}">{{ it.name }}</option>
           {% endfor %}
         </select>
       </label>
+
       <label class="block text-sm font-medium text-slate-700">
         数量
         <input type="number" name="quantity" step="1" min="1" required
           class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
       </label>
+
+      <label class="block text-sm font-medium text-slate-700">
+        单号/来源（可选）
+        <input type="text" name="reference"
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+
+      <label class="block text-sm font-medium text-slate-700">
+        备注（可选）
+        <textarea name="note" rows="2"
+          class="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"></textarea>
+      </label>
     </div>
+
     <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
-      <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
-        type="button" onclick="closeAll()">取消</button>
-      <button class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800"
+      <button class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        type="button" data-close>取消</button>
+      <button class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800"
         type="submit">提交</button>
     </div>
   </form>
 </div>
 
+<!-- {# =========================
+  Outbound Modal
+========================= #} -->
 <div id="modalOutbound"
   class="fixed left-1/2 top-10 z-40 hidden w-[560px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
-  <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">出库</div>
+  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <div class="text-base font-semibold text-slate-900">出库</div>
+    <button type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+      data-close>关闭</button>
+  </div>
+
   <form method="post" action="{% url 'products:inventory_outbound' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
     <input type="hidden" name="form_token" value="{{ form_tokens.outbound }}">
+
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
         仓库
@@ -215,39 +335,64 @@
           {% endfor %}
         </select>
       </label>
+
       <label class="block text-sm font-medium text-slate-700">
         物品
         <select id="outItem" name="item_id" required
           class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
           {% for it in form_items %}
-            <option value="{{ it.id }}" data-unit-label="{{ it.get_unit_display }}">{{ it.name }}</option>
+            <option value="{{ it.id }}" data-unit-label="{{ it.unit.name }}">{{ it.name }}</option>
           {% endfor %}
         </select>
       </label>
+
       <div class="space-y-2 text-sm text-slate-600">
         <div>当前库存：
           <span id="outOnHand" class="text-base font-semibold text-slate-900">0</span>
           <span id="outOnHandUnit" class="ml-1 text-sm text-slate-500"></span>
         </div>
-        <input type="number" name="quantity" step="1" min="1" required
+
+        <input id="outQty" type="number" name="quantity" step="1" min="1" required
           class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
       </div>
+
+      <label class="block text-sm font-medium text-slate-700">
+        单号/来源（可选）
+        <input type="text" name="reference"
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+
+      <label class="block text-sm font-medium text-slate-700">
+        备注（可选）
+        <textarea name="note" rows="2"
+          class="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"></textarea>
+      </label>
     </div>
+
     <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
-      <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
-        type="button" onclick="closeAll()">取消</button>
-      <button class="inline-flex items-center rounded-xl border border-red-200 bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-red-600/30 transition hover:bg-red-500"
+      <button class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        type="button" data-close>取消</button>
+      <button class="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-red-600/30 hover:bg-red-500"
         type="submit">提交</button>
     </div>
   </form>
 </div>
 
+<!-- {# =========================
+  Adjust Modal
+========================= #} -->
 <div id="modalAdjust"
   class="fixed left-1/2 top-10 z-40 hidden w-[600px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
-  <div class="border-b border-slate-200 px-5 py-3 text-base font-semibold text-slate-900">库存调整</div>
+  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <div class="text-base font-semibold text-slate-900">库存调整</div>
+    <button type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+      data-close>关闭</button>
+  </div>
+
   <form method="post" action="{% url 'products:inventory_adjust' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
     <input type="hidden" name="form_token" value="{{ form_tokens.adjust }}">
+
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
         仓库
@@ -258,15 +403,17 @@
           {% endfor %}
         </select>
       </label>
+
       <label class="block text-sm font-medium text-slate-700">
         物品
         <select id="adjustItem" name="item_id" required
           class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
           {% for it in form_items %}
-            <option value="{{ it.id }}" data-unit-label="{{ it.get_unit_display }}">{{ it.name }}</option>
+            <option value="{{ it.id }}" data-unit-label="{{ it.unit.name }}">{{ it.name }}</option>
           {% endfor %}
         </select>
       </label>
+
       <label class="block text-sm font-medium text-slate-700">
         数量（正数增加，负数减少）
         <div class="mt-1 flex items-center gap-2">
@@ -276,208 +423,319 @@
         </div>
         <p class="mt-1 text-xs text-slate-500">例如：+10 代表盘盈，-5 代表盘亏</p>
       </label>
-      <label class="block text-sm font-medium text-slate-700">
-        单号/来源（可选）
-        <input type="text" name="reference" id="adjustReference"
-          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
-      </label>
+
       <label class="block text-sm font-medium text-slate-700">
         备注（可选）
         <textarea name="note" id="adjustNote" rows="3"
           class="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"></textarea>
       </label>
     </div>
+
     <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
-      <button class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
-        type="button" onclick="closeAll()">取消</button>
-      <button class="inline-flex items-center rounded-xl border border-amber-200 bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-amber-500/30 transition hover:bg-amber-400"
+      <button class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        type="button" data-close>取消</button>
+      <button class="rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-amber-500/30 hover:bg-amber-400"
         type="submit">提交调整</button>
     </div>
   </form>
 </div>
 
+<!-- {# =========================
+  Item Modal (Create/Edit)
+========================= #} -->
+<div id="modalItem"
+  class="fixed left-1/2 top-10 z-40 hidden w-[520px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
+  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <div id="modalTitle" class="text-base font-semibold text-slate-900">新增物品</div>
+    <button type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+      data-close>关闭</button>
+  </div>
+
+  <form id="itemForm" method="post" data-prevent-double-submit="true">
+    {% csrf_token %}
+    <div class="space-y-4 px-5 py-4">
+      <label class="block text-sm font-medium text-slate-700">
+        名称
+        <input id="fName" name="name" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+
+      <label class="block text-sm font-medium text-slate-700">
+        单位
+        <select id="fUnit" name="unit" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          {% for value, label in units %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="block text-sm font-medium text-slate-700">
+        所属品类（仓库）
+        <select id="fWarehouse" name="warehouse_id" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          <option value="" disabled selected>请选择品类</option>
+          {% for wh in warehouses %}
+            <option value="{{ wh.id }}">{{ wh.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="flex items-center gap-2 text-sm text-slate-700">
+        <input id="fActive" type="checkbox" name="is_active" class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500">
+        启用
+      </label>
+    </div>
+
+    <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
+      <button type="button" data-close
+        class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+        取消
+      </button>
+      <button type="submit"
+        class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800">
+        保存
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- {# =========================
+  JS (refactored)
+========================= #} -->
 <script>
-  const hiddenClass = "hidden";
-  const filterForm = document.getElementById("inventoryFilterForm");
-  if (filterForm) {
-    const showInactiveToggle = filterForm.querySelector("input[name='show_inactive']");
-    const warehouseSelect = filterForm.querySelector("select[name='warehouse_id']");
-    const searchInput = filterForm.querySelector("input[name='q']");
-
-    if (showInactiveToggle) {
-      showInactiveToggle.addEventListener("change", () => filterForm.requestSubmit());
-    }
-
-    if (warehouseSelect) {
-      warehouseSelect.addEventListener("change", () => filterForm.requestSubmit());
-    }
-
-    if (searchInput) {
-      let searchTimer;
-      searchInput.addEventListener("input", () => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => filterForm.requestSubmit(), 500);
-      });
-    }
-  }
-
+(function () {
+  const hidden = "hidden";
   const backdrop = document.getElementById("backdrop");
-  const modalInbound = document.getElementById("modalInbound");
-  const modalOutbound = document.getElementById("modalOutbound");
-  const modalAdjust = document.getElementById("modalAdjust");
-  const lowStockModal = document.getElementById("lowStockModal");
-  const lowStockStorageKey = "lowStockModalState";
-  let state = null;
-  let hasLocalStorage = false;
-  let currentSlotKey = null;
 
-  function openModal(m) {
-    backdrop.classList.remove(hiddenClass);
-    m.classList.remove(hiddenClass);
+  const modals = {
+    inbound: document.getElementById("modalInbound"),
+    outbound: document.getElementById("modalOutbound"),
+    adjust: document.getElementById("modalAdjust"),
+    item: document.getElementById("modalItem"),
+    lowStock: document.getElementById("lowStockModal"),
+  };
+
+  const els = {
+    // inbound
+    inWarehouse: document.getElementById("inWarehouse"),
+    inItem: document.getElementById("inItem"),
+
+    // outbound
+    outWarehouse: document.getElementById("outWarehouse"),
+    outItem: document.getElementById("outItem"),
+    outOnHand: document.getElementById("outOnHand"),
+    outOnHandUnit: document.getElementById("outOnHandUnit"),
+
+    // adjust
+    adjustWarehouse: document.getElementById("adjustWarehouse"),
+    adjustItem: document.getElementById("adjustItem"),
+    adjustQuantity: document.getElementById("adjustQuantity"),
+    adjustNote: document.getElementById("adjustNote"),
+    adjustUnitHint: document.getElementById("adjustUnitHint"),
+
+    // item modal
+    modalTitle: document.getElementById("modalTitle"),
+    itemForm: document.getElementById("itemForm"),
+    fName: document.getElementById("fName"),
+    fUnit: document.getElementById("fUnit"),
+    fWarehouse: document.getElementById("fWarehouse"),
+    fActive: document.getElementById("fActive"),
+  };
+
+  const balanceData = (() => {
+    try {
+      return JSON.parse(document.getElementById("balance-data").textContent || "{}");
+    } catch (e) {
+      return {};
+    }
+  })();
+
+  let activeModalKey = null;
+
+  function showModal(key) {
+    if (!modals[key]) return;
+    closeAll();
+    activeModalKey = key;
+    backdrop.classList.remove(hidden);
+    modals[key].classList.remove(hidden);
   }
+
   function closeAll() {
-    backdrop.classList.add(hiddenClass);
-    modalInbound.classList.add(hiddenClass);
-    modalOutbound.classList.add(hiddenClass);
-    if (modalAdjust) modalAdjust.classList.add(hiddenClass);
-    if (lowStockModal) lowStockModal.classList.add(hiddenClass);
+    activeModalKey = null;
+    backdrop.classList.add(hidden);
+    Object.values(modals).forEach(m => m && m.classList.add(hidden));
   }
 
-  const adjustWarehouse = document.getElementById("adjustWarehouse");
-  const adjustItem = document.getElementById("adjustItem");
-  const adjustQuantity = document.getElementById("adjustQuantity");
-  const adjustReference = document.getElementById("adjustReference");
-  const adjustNote = document.getElementById("adjustNote");
-  const adjustUnitHint = document.getElementById("adjustUnitHint");
-
-  function updateAdjustUnit() {
-    if (!adjustUnitHint || !adjustItem) return;
-    const option = adjustItem.options[adjustItem.selectedIndex];
-    adjustUnitHint.textContent = option ? option.dataset.unitLabel || "" : "";
+  function getUnitLabelFromSelect(selectEl) {
+    if (!selectEl) return "";
+    const opt = selectEl.options[selectEl.selectedIndex];
+    return opt ? (opt.dataset.unitLabel || "") : "";
   }
 
-  if (adjustItem) {
-    adjustItem.addEventListener("change", updateAdjustUnit);
+  // ---------- outbound stock display ----------
+  function updateOutOnHand() {
+    if (!els.outWarehouse || !els.outItem) return;
+    const key = `${els.outWarehouse.value}-${els.outItem.value}`;
+    const qty = balanceData[key] ?? "0";
+    els.outOnHand.textContent = qty;
+    if (els.outOnHandUnit) els.outOnHandUnit.textContent = getUnitLabelFromSelect(els.outItem);
   }
+
+  if (els.outWarehouse) els.outWarehouse.addEventListener("change", updateOutOnHand);
+  if (els.outItem) els.outItem.addEventListener("change", updateOutOnHand);
+
+  // ---------- adjust unit hint ----------
+  function updateAdjustUnitHint() {
+    if (!els.adjustUnitHint || !els.adjustItem) return;
+    els.adjustUnitHint.textContent = getUnitLabelFromSelect(els.adjustItem);
+  }
+  if (els.adjustItem) els.adjustItem.addEventListener("change", updateAdjustUnitHint);
 
   function resetAdjustFields() {
-    if (adjustQuantity) adjustQuantity.value = "";
-    if (adjustReference) adjustReference.value = "";
-    if (adjustNote) adjustNote.value = "";
+    if (els.adjustQuantity) els.adjustQuantity.value = "";
+    if (els.adjustNote) els.adjustNote.value = "";
   }
 
-  const balanceData = JSON.parse(
-    document.getElementById("balance-data").textContent
-  );
+  // ---------- open handlers (data-open) ----------
+  document.querySelectorAll("[data-open]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.open;
+      const warehouseId = btn.dataset.warehouse;
+      const itemId = btn.dataset.item;
 
-  const outWarehouse = document.getElementById("outWarehouse");
-  const outItem = document.getElementById("outItem");
-  const outOnHand = document.getElementById("outOnHand");
-  const outOnHandUnit = document.getElementById("outOnHandUnit");
+      if (key === "inbound") {
+        if (els.inWarehouse && warehouseId) els.inWarehouse.value = warehouseId;
+        if (els.inItem && itemId) els.inItem.value = itemId;
+        showModal("inbound");
+        return;
+      }
 
-  function updateOutOnHand() {
-    const key = `${outWarehouse.value}-${outItem.value}`;
-    const quantity = balanceData[key] ?? "0";
-    const option = outItem.options[outItem.selectedIndex];
-    const unitLabel = option ? option.dataset.unitLabel || "" : "";
-    outOnHand.textContent = quantity;
-    if (outOnHandUnit) outOnHandUnit.textContent = unitLabel;
+      if (key === "outbound") {
+        if (els.outWarehouse && warehouseId) els.outWarehouse.value = warehouseId;
+        if (els.outItem && itemId) els.outItem.value = itemId;
+        updateOutOnHand();
+        showModal("outbound");
+        return;
+      }
+
+      if (key === "adjust") {
+        if (els.adjustWarehouse && warehouseId) els.adjustWarehouse.value = warehouseId;
+        if (els.adjustItem && itemId) els.adjustItem.value = itemId;
+        updateAdjustUnitHint();
+        resetAdjustFields();
+        showModal("adjust");
+        return;
+      }
+
+      if (key === "item") {
+        const mode = btn.dataset.mode || "edit";
+        if (!els.itemForm) return;
+
+        if (mode === "edit") {
+          els.modalTitle.textContent = "编辑物品";
+          els.itemForm.action = `/items/${btn.dataset.id}/edit/`;
+          if (els.fName) els.fName.value = btn.dataset.name || "";
+          if (els.fUnit) els.fUnit.value = btn.dataset.unit || "";
+          if (els.fWarehouse) els.fWarehouse.value = btn.dataset.warehouse || "";
+          if (els.fActive) els.fActive.checked = (btn.dataset.active === "1");
+        }
+        showModal("item");
+        return;
+      }
+    });
+  });
+
+  // ---------- new item ----------
+  const btnNewItem = document.getElementById("btnNewItem");
+  if (btnNewItem && els.itemForm) {
+    btnNewItem.addEventListener("click", () => {
+      els.modalTitle.textContent = "新增物品";
+      els.itemForm.action = "{% url 'products:item_create' %}";
+      if (els.fName) els.fName.value = "";
+      if (els.fUnit && els.fUnit.options.length > 0) els.fUnit.selectedIndex = 0;
+      if (els.fWarehouse && els.fWarehouse.options.length > 0) els.fWarehouse.selectedIndex = 0;
+      if (els.fActive) els.fActive.checked = true;
+      showModal("item");
+    });
   }
 
-  outWarehouse.onchange = updateOutOnHand;
-  outItem.onchange = updateOutOnHand;
+  // ---------- low stock reminders ----------
+  const lowStockModal = modals.lowStock;
+  const lowStockBtn = document.getElementById("btnLowStock");
+  const slotDefs = [
+    { key: "morning", startHour: 9 },
+    { key: "afternoon", startHour: 14 },
+    { key: "evening", startHour: 18 },
+  ];
+  const storageKey = "inventory-low-stock-slots";
+  let slotState = null;
+  let currentSlot = null;
 
-  function openInboundWith(w, i) {
-    document.getElementById("inWarehouse").value = w;
-    document.getElementById("inItem").value = i;
-    openModal(modalInbound);
-  }
-
-  function openOutboundWith(w, i) {
-    outWarehouse.value = w;
-    outItem.value = i;
-    updateOutOnHand();
-    openModal(modalOutbound);
-  }
-
-  function openAdjustWith(w, i) {
-    if (adjustWarehouse) adjustWarehouse.value = w;
-    if (adjustItem) adjustItem.value = i;
-    updateAdjustUnit();
-    resetAdjustFields();
-    openModal(modalAdjust);
-  }
-
-  backdrop.onclick = closeAll;
-
-  function openLowStockModal(force = false) {
-    if (!lowStockModal) return;
-    const lowStockCount = parseInt(lowStockModal.dataset.lowStockCount || "0", 10);
-    if (lowStockCount <= 0) return;
-    openModal(lowStockModal);
-    if (!force) {
-      persistLowStockSlot();
+  function loadSlotState() {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+      return null;
     }
   }
 
-  function persistLowStockSlot() {
-    if (!currentSlotKey) return;
-    if (!state || !state.slots || state.slots[currentSlotKey]) return;
-    state.slots[currentSlotKey] = true;
-    if (hasLocalStorage) {
-      try {
-        localStorage.setItem(lowStockStorageKey, JSON.stringify(state));
-      } catch (err) {}
-    }
+  function saveSlotState(state) {
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch (err) {}
   }
 
-  if (lowStockModal) {
-    const lowStockCount = parseInt(lowStockModal.dataset.lowStockCount || "0", 10);
+  function shouldAutoShow() {
+    if (!lowStockModal) return false;
+    const count = parseInt(lowStockModal.dataset.lowStockCount || "0", 10);
+    if (count <= 0) return false;
+    if (typeof window === "undefined" || !window.localStorage) return true;
+
     const now = new Date();
-    const todayKey = now.toISOString().slice(0, 10);
-    const currentHour = now.getHours();
-
-    const slotDefs = [
-      { key: "morning", startHour: 9 },
-      { key: "afternoon", startHour: 14 },
-      { key: "evening", startHour: 18 },
-    ];
-
-    hasLocalStorage = (() => {
-      try {
-        return typeof window !== "undefined" && !!window.localStorage;
-      } catch (err) {
-        return false;
-      }
-    })();
-
-    if (hasLocalStorage) {
-      try {
-        state = JSON.parse(localStorage.getItem(lowStockStorageKey));
-      } catch (err) {
-        state = null;
-      }
+    const today = now.toISOString().slice(0, 10);
+    slotState = loadSlotState();
+    if (!slotState || slotState.date !== today) {
+      slotState = { date: today, slots: { morning: false, afternoon: false, evening: false } };
     }
 
-    if (!state || state.date !== todayKey) {
-      state = {
-        date: todayKey,
-        slots: {
-          morning: false,
-          afternoon: false,
-          evening: false,
-        },
-      };
-    } else if (!state.slots) {
-      state.slots = { morning: false, afternoon: false, evening: false };
-    }
-
-    const nextSlot = slotDefs.find((slot) => currentHour >= slot.startHour && !state.slots[slot.key]);
-    currentSlotKey = nextSlot ? nextSlot.key : null;
-
-    if (lowStockCount > 0 && currentSlotKey) {
-      openLowStockModal();
-    }
+    currentSlot = slotDefs.find(slot => now.getHours() >= slot.startHour && !slotState.slots[slot.key]);
+    return Boolean(currentSlot);
   }
+
+  function markSlotUsed() {
+    if (!slotState || !currentSlot || typeof window === "undefined" || !window.localStorage) return;
+    slotState.slots[currentSlot.key] = true;
+    saveSlotState(slotState);
+  }
+
+  function showLowStock(force = false) {
+    if (!lowStockModal) return;
+    const count = parseInt(lowStockModal.dataset.lowStockCount || "0", 10);
+    if (count <= 0) return;
+    showModal("lowStock");
+    if (!force) markSlotUsed();
+  }
+
+  if (lowStockBtn) {
+    lowStockBtn.addEventListener("click", () => showLowStock(true));
+  }
+
+  if (shouldAutoShow()) {
+    showLowStock();
+  }
+
+  // ---------- close ----------
+  backdrop.addEventListener("click", closeAll);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAll();
+  });
+  document.querySelectorAll("[data-close]").forEach(btn => {
+    btn.addEventListener("click", closeAll);
+  });
+
+})();
 </script>
+
 {% endblock %}

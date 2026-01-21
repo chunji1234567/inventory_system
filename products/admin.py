@@ -1,22 +1,30 @@
 from django.contrib import admin
-from .models import Warehouse, Item, StockMove, StockBalance
+from .models import Warehouse, Item, StockMove, StockBalance, Unit
+
+
+@admin.register(Unit)
+class UnitAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+    ordering = ("name",)
 
 
 @admin.register(Warehouse)
 class WarehouseAdmin(admin.ModelAdmin):
-    list_display = ("name", "is_active", "created_at")
+    list_display = ("name", "warehouse_type", "is_active", "created_at")
     search_fields = ("name",)
-    list_filter = ("is_active",)
+    list_filter = ("warehouse_type", "is_active")
     ordering = ("name",)
 
 
 @admin.register(Item)
 class ItemAdmin(admin.ModelAdmin):
-    list_display = ("name", "warehouse", "unit", "category", "is_active", "created_at")
-    search_fields = ("name", "barcode", "warehouse__name")
-    list_filter = ("warehouse", "unit", "is_active", "category")
+    list_display = ("name", "unit", "category", "is_active", "created_at")
+    search_fields = ("name", "barcode")
+    list_filter = ("unit", "is_active", "category")
     ordering = ("name",)
-    autocomplete_fields = ("warehouse",)
+    autocomplete_fields = ("unit",)
 
 
 @admin.register(StockMove)

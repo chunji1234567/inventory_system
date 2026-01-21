@@ -1,14 +1,5 @@
-from decimal import Decimal
 from django.db import models
 from django.core.exceptions import ValidationError
-
-
-class Unit(models.TextChoices):
-    PCS = "PCS", "件"
-    BOX = "BOX", "箱"
-    GE = "GE", "个"
-    ZHI = "ZHI", "只"
-    OTHER = "OTHER", "其他"
 
 
 class MoveType(models.TextChoices):
@@ -17,8 +8,37 @@ class MoveType(models.TextChoices):
     ADJUST = "ADJUST", "调整"
 
 
+class WarehouseType(models.TextChoices):
+    RAW = "RAW", "原材料仓"
+    FINISHED = "FINISHED", "成品仓"
+    BOTH = "BOTH", "通用仓"
+
+
+class Unit(models.Model):
+    """
+    单位字典表：可由后台随时新增/修改（更灵活）
+    """
+    name = models.CharField(max_length=50, unique=True, verbose_name="单位名称")  # e.g. 件, 箱
+    is_active = models.BooleanField(default=True, verbose_name="是否启用")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "单位"
+        verbose_name_plural = "单位"
+
+    def __str__(self):
+        return self.name
+
+
 class Warehouse(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="仓库名称")
+    warehouse_type = models.CharField(
+        max_length=20,
+        choices=WarehouseType.choices,
+        default=WarehouseType.BOTH,
+        verbose_name="仓库类型",
+    )
     is_active = models.BooleanField(default=True, verbose_name="是否启用")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -28,25 +48,29 @@ class Warehouse(models.Model):
         verbose_name_plural = "仓库"
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.get_warehouse_type_display()})"
 
 
 class Item(models.Model):
-    """物品主档（SKU 字段已移除，仅保留名称）。"""
+    """物品主档：描述“是什么”"""
     name = models.CharField(max_length=100, unique=True, verbose_name="名称")
-    unit = models.CharField(max_length=20, choices=Unit.choices, default=Unit.PCS, verbose_name="单位")
-    category = models.CharField(max_length=50, blank=True, verbose_name="分类（可选）")
-    barcode = models.CharField(max_length=80, blank=True, verbose_name="条码（可选）")
+
+    unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT,
+        related_name="items",
+        verbose_name="单位"
+    )
     warehouse = models.ForeignKey(
         Warehouse,
         on_delete=models.PROTECT,
         related_name="items",
+        verbose_name="所属品类",
         null=True,
-        verbose_name="所属仓库",
+        blank=True,
     )
-
+    category = models.CharField(max_length=50, blank=True, verbose_name="分类（可选）")
     is_active = models.BooleanField(default=True, verbose_name="是否启用")
-    is_finished_good = models.BooleanField(default=False, verbose_name="是否为成品")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -61,13 +85,6 @@ class Item(models.Model):
 
 
 class StockMove(models.Model):
-    """
-    库存流水（权威来源）
-    约定：
-    - 入库：quantity > 0
-    - 出库：quantity < 0
-    - 调整：正负皆可
-    """
     move_type = models.CharField(max_length=20, choices=MoveType.choices, verbose_name="类型")
 
     item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="moves")
@@ -96,29 +113,22 @@ class StockMove(models.Model):
         if self.quantity is None:
             return
 
-        # 统一规则：入库永远为正、出库永远为负、调整随意
-        if self.move_type == "INBOUND" and self.quantity < 0:
+        if self.move_type == MoveType.INBOUND and self.quantity < 0:
             self.quantity = abs(self.quantity)
 
-        if self.move_type == "OUTBOUND" and self.quantity > 0:
+        if self.move_type == MoveType.OUTBOUND and self.quantity > 0:
             self.quantity = -abs(self.quantity)
 
-        # 可选：禁止 0
         if self.quantity == 0:
             raise ValidationError({"quantity": "数量不能为 0"})
 
     def __str__(self):
-        return f"{self.move_type} {self.item.name} {self.quantity}"
-    
+        return f"{self.move_type} {self.item.name} {self.quantity} @ {self.warehouse.name}"
 
 
 class StockBalance(models.Model):
-    """
-    当前库存余额（缓存表）
-    """
     item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="balances")
     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name="balances")
-
     on_hand = models.IntegerField(default=0, verbose_name="当前库存")
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -4,7 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import reverse
 
-from products.models import Warehouse, Item, StockMove, StockBalance, MoveType
+from products.models import Warehouse, Item, StockMove, StockBalance, MoveType, WarehouseType
+from products.views.inventory import _role_filter_kwargs
 
 
 def _verify_form_token(request, key: str) -> bool:
@@ -26,6 +27,8 @@ def inbound_create(request):
         messages.error(request, "请勿重复提交入库请求")
         return redirect(reverse("products:inventory_dashboard"))
 
+    role_context = _role_filter_kwargs(request.user)
+
     warehouse_id = request.POST.get("warehouse_id")
     item_id = request.POST.get("item_id")
     qty_str = (request.POST.get("quantity") or "").strip()
@@ -40,8 +43,12 @@ def inbound_create(request):
         messages.error(request, "入库失败：数量必须是 > 0 的数字")
         return redirect(reverse("products:inventory_dashboard"))
 
-    warehouse = Warehouse.objects.filter(id=warehouse_id, is_active=True).first()
-    item = Item.objects.filter(id=item_id, is_active=True).first()
+    warehouse = (
+        role_context["warehouse"]
+        .filter(id=warehouse_id)
+        .first()
+    )
+    item = Item.objects.filter(id=item_id, is_active=True, warehouse=warehouse).first()
     
     if not warehouse or not item:
         messages.error(request, "入库失败：仓库或物品不存在/未启用")
@@ -68,6 +75,8 @@ def outbound_create(request):
         messages.error(request, "请勿重复提交出库请求")
         return redirect(reverse("products:inventory_dashboard"))
 
+    role_context = _role_filter_kwargs(request.user)
+
     warehouse_id = request.POST.get("warehouse_id")
     item_id = request.POST.get("item_id")
     qty_str = (request.POST.get("quantity") or "").strip()
@@ -84,8 +93,12 @@ def outbound_create(request):
         return redirect(reverse("products:inventory_dashboard"))
 
     # 2) 校验仓库/物品存在
-    warehouse = Warehouse.objects.filter(id=warehouse_id, is_active=True).first()
-    item = Item.objects.filter(id=item_id, is_active=True).first()
+    warehouse = (
+        role_context["warehouse"]
+        .filter(id=warehouse_id)
+        .first()
+    )
+    item = Item.objects.filter(id=item_id, is_active=True, warehouse=warehouse).first()
     if not warehouse or not item:
         messages.error(request, "出库失败：仓库或物品不存在/未启用")
         return redirect(reverse("products:inventory_dashboard"))
@@ -123,6 +136,8 @@ def adjust_create(request):
         messages.error(request, "请勿重复提交库存调整")
         return redirect(reverse("products:inventory_dashboard"))
 
+    role_context = _role_filter_kwargs(request.user)
+
     warehouse_id = request.POST.get("warehouse_id")
     item_id = request.POST.get("item_id")
     qty_str = (request.POST.get("quantity") or "").strip()
@@ -137,8 +152,12 @@ def adjust_create(request):
         messages.error(request, "调整失败：数量必须是非 0 数字，可正可负")
         return redirect(reverse("products:inventory_dashboard"))
 
-    warehouse = Warehouse.objects.filter(id=warehouse_id, is_active=True).first()
-    item = Item.objects.filter(id=item_id).first()
+    warehouse = (
+        role_context["warehouse"]
+        .filter(id=warehouse_id)
+        .first()
+    )
+    item = Item.objects.filter(id=item_id, warehouse=warehouse).first()
     if not warehouse or not item:
         messages.error(request, "调整失败：仓库或物品不存在/未启用")
         return redirect(reverse("products:inventory_dashboard"))

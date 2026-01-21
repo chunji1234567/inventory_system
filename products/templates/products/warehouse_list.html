@@ -4,13 +4,19 @@
 {% block content %}
 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
   <div>
-    <h1 class="text-2xl font-semibold text-slate-900">仓库管理</h1>
-    <p class="text-sm text-slate-500">维护仓库信息以便准确分仓记录</p>
+    <h1 class="text-2xl font-semibold text-slate-900">品类管理</h1>
+    <p class="text-sm text-slate-500">创建产品大分类</p>
   </div>
-  <button class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/25 transition hover:bg-slate-800"
-    type="button" id="btnOpenCreate">
-    + 新增仓库
-  </button>
+  <div class="flex gap-3">
+    <button class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+      type="button" id="btnOpenUnit">
+      管理单位
+    </button>
+    <button class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/25 transition hover:bg-slate-800"
+      type="button" id="btnOpenCreate">
+      + 新增品类
+    </button>
+  </div>
 </div>
 
 <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -18,6 +24,7 @@
     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
       <tr>
         <th class="px-4 py-3">名称</th>
+        <th class="px-4 py-3">类型</th>
         <th class="px-4 py-3">启用</th>
         <th class="px-4 py-3">操作</th>
       </tr>
@@ -26,6 +33,7 @@
       {% for w in warehouses %}
         <tr class="transition hover:bg-slate-50/60">
           <td class="px-4 py-3 text-slate-800">{{ w.name }}</td>
+          <td class="px-4 py-3 text-slate-500">{{ w.get_warehouse_type_display }}</td>
           <td class="px-4 py-3">
             {% if w.is_active %}
               <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">启用</span>
@@ -121,12 +129,61 @@
   </form>
 </div>
 
+<div id="modalUnit"
+  class="fixed left-1/2 top-12 z-40 hidden w-[520px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-2xl bg-white shadow-2xl">
+  <header class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <strong class="text-base font-semibold text-slate-900">管理单位</strong>
+    <button class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
+      type="button" id="btnCloseUnit">关闭</button>
+  </header>
+
+  <div class="max-h-[60vh] overflow-y-auto px-5 py-4 text-sm text-slate-700">
+    <ul class="space-y-2">
+      {% for unit in units %}
+        <li class="rounded-xl border border-slate-200 px-4 py-2 flex items-center justify-between">
+          <span class="font-semibold text-slate-900">{{ unit.name }}</span>
+          {% if unit.is_active %}
+            <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">启用</span>
+          {% else %}
+            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">停用</span>
+          {% endif %}
+        </li>
+      {% empty %}
+        <li class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-500">暂无单位</li>
+      {% endfor %}
+    </ul>
+
+    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <h3 class="text-sm font-semibold text-slate-800">新增单位</h3>
+      <form method="post" action="{% url 'products:unit_create' %}" class="mt-3 space-y-3" data-prevent-double-submit="true">
+        {% csrf_token %}
+        <label class="block text-sm font-medium text-slate-700">
+          单位名称
+          <input type="text" name="name" required
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+        </label>
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+          <input type="checkbox" name="is_active" class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500" checked>
+          启用
+        </label>
+        <div class="flex justify-end">
+          <button type="submit"
+            class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800">
+            保存
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
   const hiddenClass = "hidden";
   const backdrop = document.getElementById("backdrop");
   const modalForm = document.getElementById("modalForm");
   const modalToggle = document.getElementById("modalToggle");
-  const modals = [modalForm, modalToggle];
+  const modalUnit = document.getElementById("modalUnit");
+  const modals = [modalForm, modalToggle, modalUnit];
 
   const warehouseForm = document.getElementById("warehouseForm");
   const modalTitle = document.getElementById("modalTitle");
@@ -166,10 +223,18 @@
     openModal(modalForm);
   });
 
+  const btnOpenUnit = document.getElementById("btnOpenUnit");
+  if (btnOpenUnit) {
+    btnOpenUnit.addEventListener("click", () => openModal(modalUnit));
+  }
+
   document.getElementById("btnCloseForm").onclick = () => closeModal(modalForm);
   document.getElementById("btnCancelForm").onclick = () => closeModal(modalForm);
   document.getElementById("btnCloseToggle").onclick = () => closeModal(modalToggle);
   document.getElementById("btnCancelToggle").onclick = () => closeModal(modalToggle);
+  if (modalUnit) {
+    document.getElementById("btnCloseUnit").onclick = () => closeModal(modalUnit);
+  }
   backdrop.onclick = () => {
     modals.forEach(closeModal);
   };

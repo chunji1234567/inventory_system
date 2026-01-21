@@ -2,7 +2,8 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import render
 
-from products.models import StockMove, Warehouse, Item, MoveType
+from products.models import StockMove, Warehouse, Item, MoveType, WarehouseType
+from products.views.inventory import _role_filter_kwargs
 
 
 @login_required
@@ -15,9 +16,12 @@ def stockmove_list(request):
         move_type = "ALL"
     q = (request.GET.get("q") or "").strip()
 
+    role_context = _role_filter_kwargs(request.user)
+
     moves = (
         StockMove.objects
         .select_related("warehouse", "item")
+        .filter(**role_context.get("warehouse_filter", {}))
         .order_by("-created_at", "-id")
     )
 
@@ -42,8 +46,9 @@ def stockmove_list(request):
             Q(warehouse__name__icontains=q)
         )
 
-    warehouses = Warehouse.objects.filter(is_active=True).order_by("name")
-    items = Item.objects.filter(is_active=True).order_by("name")
+    warehouses = role_context["warehouse"].order_by("name")
+    allowed_warehouse_ids = list(warehouses.values_list("id", flat=True))
+    items = Item.objects.filter(is_active=True, warehouse_id__in=allowed_warehouse_ids).order_by("name")
     move_type_options = [
         {"value": "ALL", "label": "全部", "active": move_type == "ALL"},
         {"value": MoveType.INBOUND, "label": "入库", "active": move_type == MoveType.INBOUND},

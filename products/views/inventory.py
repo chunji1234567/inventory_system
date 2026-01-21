@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import render
 
-from products.models import Warehouse, StockBalance, Item
+from products.models import Warehouse, StockBalance, Item, WarehouseType, Unit
 
 
 def _issue_form_token(request, key: str) -> str:
@@ -15,13 +15,55 @@ def _issue_form_token(request, key: str) -> str:
     return token
 
 
+def _role_filter_kwargs(user):
+    def in_group(names):
+        return user.groups.filter(name__in=names).exists()
+
+    if user.is_superuser or in_group({"admin", "ADMIN"}):
+        return {
+            "warehouse": Warehouse.objects.filter(is_active=True),
+            "warehouse_filter": {},
+        }
+
+    if in_group({"finished", "FINISHED"}):
+        return {
+            "warehouse": Warehouse.objects.filter(
+                is_active=True,
+                warehouse_type__in=[WarehouseType.FINISHED, WarehouseType.BOTH],
+            ),
+            "warehouse_filter": {
+                "warehouse__warehouse_type__in": [WarehouseType.FINISHED, WarehouseType.BOTH],
+            },
+        }
+
+    if in_group({"raw", "RAW"}):
+        return {
+            "warehouse": Warehouse.objects.filter(
+                is_active=True,
+                warehouse_type__in=[WarehouseType.RAW, WarehouseType.BOTH],
+            ),
+            "warehouse_filter": {
+                "warehouse__warehouse_type__in": [WarehouseType.RAW, WarehouseType.BOTH],
+            },
+        }
+
+    return {
+        "warehouse": Warehouse.objects.filter(is_active=True),
+        "warehouse_filter": {},
+    }
+
+
 @login_required
 def inventory_dashboard(request):
     warehouse_id = (request.GET.get("warehouse_id") or "").strip()
     q = request.GET.get("q", "").strip()
     show_inactive = request.GET.get("show_inactive") == "1"
 
+    role_context = _role_filter_kwargs(request.user)
+
     inventory_items = Item.objects.select_related("warehouse").order_by("-created_at")
+    if role_context["warehouse_filter"]:
+        inventory_items = inventory_items.filter(**role_context["warehouse_filter"])
 
     if warehouse_id:
         inventory_items = inventory_items.filter(warehouse_id=warehouse_id)
@@ -35,8 +77,23 @@ def inventory_dashboard(request):
     if not show_inactive:
         inventory_items = inventory_items.filter(is_active=True)
 
-    warehouses = Warehouse.objects.filter(is_active=True).order_by("name")
-    form_items = Item.objects.filter(is_active=True).order_by("name")
+    warehouses = role_context["warehouse"].order_by("name")
+    allowed_warehouse_ids = list(warehouses.values_list("id", flat=True))
+    form_items = (
+        Item.objects
+        .filter(is_active=True, warehouse_id__in=allowed_warehouse_ids)
+        .order_by("name")
+    )
+    management_items = (
+        Item.objects
+        .select_related("warehouse")
+        .filter(warehouse_id__in=allowed_warehouse_ids)
+        .order_by("name")
+    )
+    if role_context["warehouse_filter"]:
+        management_items = management_items.filter(**role_context["warehouse_filter"])
+
+    unit_choices = [(unit.pk, unit.name) for unit in Unit.objects.filter(is_active=True).order_by("name")]
 
     all_balances = StockBalance.objects.select_related("warehouse", "item")
     balance_lookup = {}
@@ -67,7 +124,7 @@ def inventory_dashboard(request):
             "on_hand": quantity,
             "updated_at": balance.updated_at if balance else None,
             "has_stock": quantity > 0,
-            "is_low_stock": (not item.is_finished_good) and quantity < threshold,
+            "is_low_stock": quantity < threshold,
         }
         grouped[group_key]["rows"].append(row_data)
 
@@ -100,4 +157,6 @@ def inventory_dashboard(request):
         "low_stock_threshold": threshold,
         "low_stock_rows": low_stock_rows,
         "form_tokens": form_tokens,
+        "items": management_items,
+        "units": unit_choices,
     })
