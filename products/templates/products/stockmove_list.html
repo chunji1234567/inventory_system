@@ -41,6 +41,18 @@
       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
   </label>
 
+  <label class="flex min-w-[180px] flex-1 flex-col gap-1 text-sm font-medium text-slate-600">
+    <span>开始日期</span>
+    <input type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}"
+      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+  </label>
+
+  <label class="flex min-w-[180px] flex-1 flex-col gap-1 text-sm font-medium text-slate-600">
+    <span>结束日期</span>
+    <input type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}"
+      class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+  </label>
+
   <div class="flex flex-col gap-2 text-sm font-medium text-slate-600">
     <span>类型</span>
     <div class="flex overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 shadow-inner">
@@ -80,7 +92,7 @@
       </tr>
     </thead>
     <tbody class="divide-y divide-slate-100 text-slate-800">
-      {% for m in moves %}
+      {% for m in page_obj %}
         <tr class="transition hover:bg-slate-50/60">
           <td class="px-4 py-3 text-slate-600">{{ m.created_at|date:"Y-m-d H:i" }}</td>
           <td class="px-4 py-3">{{ m.warehouse.name }}</td>
@@ -108,6 +120,23 @@
     </tbody>
   </table>
 </div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+  <div class="mt-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm text-slate-600">
+    <div>共 {{ page_obj.paginator.count }} 条记录</div>
+    <div class="flex items-center gap-2">
+      {% if page_obj.has_previous %}
+        <a class="rounded-lg border border-slate-200 px-3 py-1 hover:bg-slate-50"
+          href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+      {% endif %}
+      <span>第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+      {% if page_obj.has_next %}
+        <a class="rounded-lg border border-slate-200 px-3 py-1 hover:bg-slate-50"
+          href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
 
 <script>
   (function () {

@@ -200,6 +200,23 @@
   </div>
 {% endif %}
 
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <div class="mt-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm text-slate-600">
+    <div>共 {{ page_obj.paginator.count }} 条记录</div>
+    <div class="flex items-center gap-2">
+      {% if page_obj.has_previous %}
+        <a class="rounded-lg border border-slate-200 px-3 py-1 hover:bg-slate-50"
+          href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+      {% endif %}
+      <span>第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+      {% if page_obj.has_next %}
+        <a class="rounded-lg border border-slate-200 px-3 py-1 hover:bg-slate-50"
+          href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
 <!-- {# =========================
   Data for JS
 ========================= #} -->

@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import render
+from django.core.paginator import Paginator
 
 from products.models import Warehouse, StockBalance, Item, WarehouseType, Unit
 
@@ -135,10 +136,34 @@ def inventory_dashboard(request):
                 "on_hand": quantity,
             })
 
-    grouped_rows = sorted(
-        grouped.values(),
-        key=lambda grp: (grp["warehouse"].name if grp["warehouse"] else "")
-    )
+    flat_rows = []
+    for group in grouped.values():
+        for row in group["rows"]:
+            flat_rows.append({
+                "warehouse": group["warehouse"],
+                "row": row,
+            })
+
+    paginator = Paginator(flat_rows, 50)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    page_grouped = OrderedDict()
+    for entry in page_obj.object_list:
+        warehouse = entry["warehouse"]
+        row = entry["row"]
+        key = warehouse.id if warehouse else None
+        if key not in page_grouped:
+            page_grouped[key] = {
+                "warehouse": warehouse,
+                "rows": [],
+            }
+        page_grouped[key]["rows"].append(row)
+
+    query_params = request.GET.copy()
+    if "page" in query_params:
+        query_params.pop("page")
+    query_string = query_params.urlencode()
 
     form_tokens = {
         "inbound": _issue_form_token(request, "inbound"),
@@ -147,7 +172,8 @@ def inventory_dashboard(request):
     }
 
     return render(request, "products/inventory_dashboard.html", {
-        "grouped_rows": grouped_rows,
+        "page_obj": page_obj,
+        "grouped_rows": page_grouped.values(),
         "warehouses": warehouses,
         "form_items": form_items,
         "selected_warehouse_id": warehouse_id,
@@ -159,4 +185,5 @@ def inventory_dashboard(request):
         "form_tokens": form_tokens,
         "items": management_items,
         "units": unit_choices,
+        "query_string": query_string,
     })

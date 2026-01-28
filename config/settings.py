@@ -151,7 +151,7 @@ INSTALLED_APPS = [
 
 
 # 库存警告
-LOW_STOCK_ALERT_THRESHOLD = int(os.getenv("LOW_STOCK_ALERT_THRESHOLD", "600000"))
+LOW_STOCK_ALERT_THRESHOLD = int(os.getenv("LOW_STOCK_ALERT_THRESHOLD", "60000"))
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

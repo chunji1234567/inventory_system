@@ -38,7 +38,8 @@ def warehouse_create(request):
     form = WarehouseForm(request.POST)
     if form.is_valid():
         warehouse = form.save(commit=False)
-        warehouse.warehouse_type = _default_warehouse_type(request.user)
+        if not warehouse.warehouse_type:
+            warehouse.warehouse_type = _default_warehouse_type(request.user)
         warehouse.save()
         messages.success(request, "仓库已新增")
     else:
@@ -55,7 +56,8 @@ def warehouse_edit(request, pk: int):
     form = WarehouseForm(request.POST, instance=obj)
     if form.is_valid():
         warehouse = form.save(commit=False)
-        warehouse.warehouse_type = _default_warehouse_type(request.user)
+        if not warehouse.warehouse_type:
+            warehouse.warehouse_type = _default_warehouse_type(request.user)
         warehouse.save()
         messages.success(request, "仓库已更新")
     else:
