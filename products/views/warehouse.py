@@ -3,8 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 
-from products.forms import WarehouseForm, UnitForm
-from products.models import Warehouse, Unit, WarehouseType
+from products.forms import WarehouseForm, UnitForm, PartnerForm
+from products.models import Warehouse, Unit, WarehouseType, Partner
 from products.views.inventory import _role_filter_kwargs
 
 
@@ -23,10 +23,14 @@ def warehouse_list(request):
     warehouses = Warehouse.objects.order_by("name")
     units = Unit.objects.order_by("name")
     unit_form = UnitForm()
+    partners = Partner.objects.order_by("name")
+    partner_form = PartnerForm()
     return render(request, "products/warehouse_list.html", {
         "warehouses": warehouses,
         "units": units,
         "unit_form": unit_form,
+        "partners": partners,
+        "partner_form": partner_form,
     })
 
 
@@ -90,6 +94,21 @@ def unit_create(request):
     if form.is_valid():
         form.save()
         messages.success(request, "单位已新增")
+    else:
+        messages.error(request, f"新增失败：{form.errors.as_text()}")
+
+    return redirect(reverse("products:warehouse_list"))
+
+
+@login_required
+def partner_create(request):
+    if request.method != "POST":
+        return redirect(reverse("products:warehouse_list"))
+
+    form = PartnerForm(request.POST)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "合作方已新增")
     else:
         messages.error(request, f"新增失败：{form.errors.as_text()}")
 

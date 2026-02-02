@@ -312,6 +312,19 @@
       </label>
 
       <label class="block text-sm font-medium text-slate-700">
+        合作方（可选）
+        <select name="partner_id"
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          <option value="">未指定</option>
+          {% for partner in partners %}
+            <option value="{{ partner.id }}">{{ partner.name }}</option>
+          {% empty %}
+            <option value="" disabled>暂无合作方</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="block text-sm font-medium text-slate-700">
         备注（可选）
         <textarea name="note" rows="2"
           class="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"></textarea>
@@ -377,6 +390,19 @@
         单号/来源（可选）
         <input type="text" name="reference"
           class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+
+      <label class="block text-sm font-medium text-slate-700">
+        合作方（可选）
+        <select name="partner_id"
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          <option value="">未指定</option>
+          {% for partner in partners %}
+            <option value="{{ partner.id }}">{{ partner.name }}</option>
+          {% empty %}
+            <option value="" disabled>暂无合作方</option>
+          {% endfor %}
+        </select>
       </label>
 
       <label class="block text-sm font-medium text-slate-700">

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Warehouse, Item, StockMove, StockBalance, Unit
+from .models import Warehouse, Item, StockMove, StockBalance, Unit, Partner
 
 
 @admin.register(Unit)
@@ -29,9 +29,9 @@ class ItemAdmin(admin.ModelAdmin):
 
 @admin.register(StockMove)
 class StockMoveAdmin(admin.ModelAdmin):
-    list_display = ("created_at", "move_type", "warehouse", "item", "quantity", "unit_cost", "reference")
-    list_filter = ("move_type", "warehouse")
-    search_fields = ("item__name", "reference", "note")
+    list_display = ("created_at", "move_type", "warehouse", "item", "partner", "quantity", "unit_cost", "reference")
+    list_filter = ("move_type", "warehouse", "partner")
+    search_fields = ("item__name", "reference", "note", "partner__name")
     ordering = ("-created_at", "-id")
 
     # ✅ 禁止修改已有流水（只能新增）
@@ -57,3 +57,11 @@ class StockBalanceAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Partner)
+class PartnerAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+    ordering = ("name",)

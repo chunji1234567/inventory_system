@@ -4,3 +4,4 @@ sqlparse==0.5.4
 typing_extensions==4.15.0
 gunicorn
 psycopg2-binary
+openpyxl

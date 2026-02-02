@@ -4,7 +4,15 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import reverse
 
-from products.models import Warehouse, Item, StockMove, StockBalance, MoveType, WarehouseType
+from products.models import (
+    Warehouse,
+    Item,
+    StockMove,
+    StockBalance,
+    MoveType,
+    WarehouseType,
+    Partner,
+)
 from products.views.inventory import _role_filter_kwargs
 
 
@@ -34,6 +42,7 @@ def inbound_create(request):
     qty_str = (request.POST.get("quantity") or "").strip()
     reference = (request.POST.get("reference") or "").strip()
     note = (request.POST.get("note") or "").strip()
+    partner_id = (request.POST.get("partner_id") or "").strip()
 
     try:
         qty = Decimal(qty_str)
@@ -54,6 +63,13 @@ def inbound_create(request):
         messages.error(request, "入库失败：仓库或物品不存在/未启用")
         return redirect(reverse("products:inventory_dashboard"))
 
+    partner = None
+    if partner_id:
+        partner = Partner.objects.filter(id=partner_id, is_active=True).first()
+        if not partner:
+            messages.error(request, "入库失败：合作方不存在或已停用")
+            return redirect(reverse("products:inventory_dashboard"))
+
     StockMove.objects.create(
         move_type=MoveType.INBOUND,
         warehouse=warehouse,
@@ -61,6 +77,7 @@ def inbound_create(request):
         quantity=qty,   # 入库：正数
         reference=reference,
         note=note,
+        partner=partner,
     )
     messages.success(request, "入库成功")
     return redirect(reverse("products:inventory_dashboard"))
@@ -82,6 +99,7 @@ def outbound_create(request):
     qty_str = (request.POST.get("quantity") or "").strip()
     reference = (request.POST.get("reference") or "").strip()
     note = (request.POST.get("note") or "").strip()
+    partner_id = (request.POST.get("partner_id") or "").strip()
 
     # 1) 校验数量
     try:
@@ -114,6 +132,13 @@ def outbound_create(request):
         return redirect(reverse("products:inventory_dashboard"))
 
     # 4) 通过校验：创建出库流水（quantity 为负数）
+    partner = None
+    if partner_id:
+        partner = Partner.objects.filter(id=partner_id, is_active=True).first()
+        if not partner:
+            messages.error(request, "出库失败：合作方不存在或已停用")
+            return redirect(reverse("products:inventory_dashboard"))
+
     StockMove.objects.create(
         move_type=MoveType.OUTBOUND,
         warehouse=warehouse,
@@ -121,6 +146,7 @@ def outbound_create(request):
         quantity=-qty,
         reference=reference,
         note=note,
+        partner=partner,
     )
 
     messages.success(request, "出库成功")

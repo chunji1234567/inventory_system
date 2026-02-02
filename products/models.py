@@ -51,6 +51,20 @@ class Warehouse(models.Model):
         return f"{self.name} ({self.get_warehouse_type_display()})"
 
 
+class Partner(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name="名称")
+    is_active = models.BooleanField(default=True, verbose_name="是否启用")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "合作方"
+        verbose_name_plural = "合作方"
+
+    def __str__(self):
+        return self.name
+
+
 class Item(models.Model):
     """物品主档：描述“是什么”"""
     name = models.CharField(max_length=100, unique=True, verbose_name="名称")
@@ -89,6 +103,14 @@ class StockMove(models.Model):
 
     item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="moves")
     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name="moves")
+    partner = models.ForeignKey(
+        Partner,
+        on_delete=models.PROTECT,
+        related_name="stock_moves",
+        null=True,
+        blank=True,
+        verbose_name="合作方",
+    )
 
     quantity = models.IntegerField(verbose_name="变动数量")
     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="单位成本(可选)")
@@ -102,6 +124,7 @@ class StockMove(models.Model):
         indexes = [
             models.Index(fields=["item", "warehouse"]),
             models.Index(fields=["created_at"]),
+            models.Index(fields=["partner"]),
         ]
         ordering = ["-created_at", "-id"]
         verbose_name = "库存流水"

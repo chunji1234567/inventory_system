@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.shortcuts import render
 from django.core.paginator import Paginator
 
-from products.models import Warehouse, StockBalance, Item, WarehouseType, Unit
+from products.models import Warehouse, StockBalance, Item, WarehouseType, Unit, Partner
 
 
 def _issue_form_token(request, key: str) -> str:
@@ -165,6 +165,8 @@ def inventory_dashboard(request):
         query_params.pop("page")
     query_string = query_params.urlencode()
 
+    partners = list(Partner.objects.filter(is_active=True).order_by("name"))
+
     form_tokens = {
         "inbound": _issue_form_token(request, "inbound"),
         "outbound": _issue_form_token(request, "outbound"),
@@ -186,4 +188,5 @@ def inventory_dashboard(request):
         "items": management_items,
         "units": unit_choices,
         "query_string": query_string,
+        "partners": partners,
     })

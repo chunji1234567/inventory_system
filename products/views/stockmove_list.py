@@ -1,19 +1,22 @@
 from datetime import timedelta
+from io import BytesIO
 
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
-from django.core.paginator import Paginator
+from openpyxl import Workbook
 
-from products.models import StockMove, Warehouse, Item, MoveType
+from products.models import StockMove, Warehouse, Item, MoveType, Partner
 from products.views.inventory import _role_filter_kwargs
 
 
-@login_required
-def stockmove_list(request):
+def _build_move_context(request):
     warehouse_id = (request.GET.get("warehouse_id") or "").strip()
     item_id = (request.GET.get("item_id") or "").strip()
+    partner_id = (request.GET.get("partner_id") or "").strip()
     move_type = (request.GET.get("move_type") or "ALL").strip().upper()
     allowed_types = {"ALL", MoveType.INBOUND, MoveType.OUTBOUND, MoveType.ADJUST}
     if move_type not in allowed_types:
@@ -39,7 +42,7 @@ def stockmove_list(request):
 
     moves = (
         StockMove.objects
-        .select_related("warehouse", "item")
+        .select_related("warehouse", "item", "partner")
         .filter(**role_context.get("warehouse_filter", {}))
         .order_by("-created_at", "-id")
     )
@@ -50,6 +53,9 @@ def stockmove_list(request):
 
     if item_id:
         moves = moves.filter(item_id=item_id)
+
+    if partner_id:
+        moves = moves.filter(partner_id=partner_id)
 
     if move_type == MoveType.INBOUND:
         moves = moves.filter(move_type=MoveType.INBOUND)
@@ -63,16 +69,14 @@ def stockmove_list(request):
             Q(reference__icontains=q) |
             Q(note__icontains=q) |
             Q(item__name__icontains=q) |
-            Q(warehouse__name__icontains=q)
+            Q(warehouse__name__icontains=q) |
+            Q(partner__name__icontains=q)
         )
 
     warehouses = role_context["warehouse"].order_by("name")
     allowed_warehouse_ids = list(warehouses.values_list("id", flat=True))
     items = Item.objects.filter(is_active=True, warehouse_id__in=allowed_warehouse_ids).order_by("name")
-
-    paginator = Paginator(moves, 50)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+    partners = Partner.objects.filter(is_active=True).order_by("name")
 
     query_params = request.GET.copy()
     if "page" in query_params:
@@ -85,16 +89,68 @@ def stockmove_list(request):
         {"value": MoveType.ADJUST, "label": "调整", "active": move_type == MoveType.ADJUST},
     ]
 
-    return render(request, "products/stockmove_list.html", {
-        "page_obj": page_obj,
+    return {
+        "moves": moves,
         "warehouses": warehouses,
         "items": items,
+        "partners": partners,
         "warehouse_id": warehouse_id,
         "item_id": item_id,
+        "partner_id": partner_id,
         "q": q,
         "move_type": move_type,
         "move_type_options": move_type_options,
         "start_date": start_date,
         "end_date": end_date,
         "query_string": query_string,
+    }
+
+
+@login_required
+def stockmove_list(request):
+    context = _build_move_context(request)
+    moves = context.pop("moves")
+
+    paginator = Paginator(moves, 50)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "products/stockmove_list.html", {
+        **context,
+        "page_obj": page_obj,
     })
+
+
+@login_required
+def stockmove_export(request):
+    context = _build_move_context(request)
+    moves = context["moves"]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "库存流水"
+    ws.append(["时间", "仓库", "物品", "合作方", "类型", "数量", "单号/来源", "备注"])
+
+    for move in moves.iterator():
+        ws.append([
+            timezone.localtime(move.created_at).strftime("%Y-%m-%d %H:%M"),
+            move.warehouse.name,
+            move.item.name,
+            move.partner.name if move.partner else "-",
+            dict(MoveType.choices).get(move.move_type, move.move_type),
+            move.quantity,
+            move.reference or "",
+            move.note or "",
+        ])
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = timezone.now().strftime("stockmoves_%Y%m%d_%H%M%S.xlsx")
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
