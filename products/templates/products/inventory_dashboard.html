@@ -84,7 +84,87 @@
         </div>
       </div>
 
-      <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
+      <div class="md:hidden space-y-3 px-3 py-4">
+        {% for row in group.rows %}
+          {% with item=row.item %}
+          <div class="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm {% if row.is_low_stock %}ring-1 ring-red-200{% endif %}">
+            <div class="flex flex-col gap-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="text-base font-semibold text-slate-900">{{ item.name }}</div>
+                {% if not item.is_active %}
+                  <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">停用</span>
+                {% endif %}
+                {% if row.is_low_stock %}
+                  <span class="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-600">低库存</span>
+                {% endif %}
+              </div>
+              <p class="text-xs text-slate-500">库存：<span class="font-semibold text-slate-900">{{ row.on_hand }}</span> ｜ 单位：{{ item.unit.name }}</p>
+              <p class="text-xs text-slate-400">更新时间：{% if row.updated_at %}{{ row.updated_at|date:"Y-m-d H:i" }}{% else %}--{% endif %}</p>
+            </div>
+
+            {% if group.warehouse %}
+              <div class="flex flex-wrap gap-2">
+                <button type="button"
+                  class="flex-1 min-w-[90px] rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-slate-800"
+                  data-open="inbound"
+                  data-warehouse="{{ group.warehouse.id }}"
+                  data-item="{{ item.id }}">
+                  入库
+                </button>
+                <button type="button"
+                  class="flex-1 min-w-[90px] rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  {% if not row.has_stock %}disabled{% endif %}
+                  data-open="outbound"
+                  data-warehouse="{{ group.warehouse.id }}"
+                  data-item="{{ item.id }}">
+                  出库
+                </button>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button type="button"
+                  class="flex-1 min-w-[90px] rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 shadow-sm transition hover:bg-amber-100"
+                  data-open="adjust"
+                  data-warehouse="{{ group.warehouse.id }}"
+                  data-item="{{ item.id }}">
+                  调整
+                </button>
+                <button type="button"
+                  class="flex-1 min-w-[90px] rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  data-open="item"
+                  data-mode="edit"
+                  data-id="{{ item.id }}"
+                  data-name="{{ item.name }}"
+                  data-unit="{{ item.unit_id }}"
+                  data-warehouse="{{ item.warehouse_id }}"
+                  data-active="{{ item.is_active|yesno:'1,0' }}">
+                  编辑
+                </button>
+                <form method="post" action="{% url 'products:item_toggle_active' item.id %}"
+                  data-prevent-double-submit="true" class="flex-1 min-w-[90px]">
+                  {% csrf_token %}
+                  <button type="submit"
+                    class="w-full rounded-xl px-3 py-1.5 text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2
+                    {% if item.is_active %}
+                      border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200
+                    {% else %}
+                      border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 focus:ring-emerald-200
+                    {% endif %}">
+                    {{ item.is_active|yesno:"停用,启用" }}
+                  </button>
+                </form>
+              </div>
+            {% else %}
+              <span class="text-xs text-slate-400">未分配仓库，无法操作</span>
+            {% endif %}
+          </div>
+          {% endwith %}
+        {% empty %}
+          <div class="py-4 text-center text-sm text-slate-500">暂无物品</div>
+        {% endfor %}
+      </div>
+
+      <div class="hidden overflow-x-auto md:block">
+        <table class="min-w-full table-fixed divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>
             <th class="px-4 py-3 w-1/3">物品</th>
@@ -191,7 +271,8 @@
             </tr>
           {% endfor %}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   {% endfor %}
 {% else %}
