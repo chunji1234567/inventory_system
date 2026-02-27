@@ -356,6 +356,7 @@
   <form method="post" action="{% url 'products:inventory_inbound' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
     <input type="hidden" name="form_token" value="{{ form_tokens.inbound }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
@@ -435,6 +436,7 @@
   <form method="post" action="{% url 'products:inventory_outbound' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
     <input type="hidden" name="form_token" value="{{ form_tokens.outbound }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
@@ -516,6 +518,7 @@
   <form method="post" action="{% url 'products:inventory_adjust' %}" class="space-y-0" data-prevent-double-submit="true">
     {% csrf_token %}
     <input type="hidden" name="form_token" value="{{ form_tokens.adjust }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
     <div class="space-y-4 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">
