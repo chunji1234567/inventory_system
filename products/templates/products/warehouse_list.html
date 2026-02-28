@@ -54,6 +54,7 @@
                 data-pk="{{ w.pk }}"
                 data-name="{{ w.name }}"
                 data-active="{{ w.is_active|yesno:'1,0' }}"
+                data-type="{{ w.warehouse_type }}"
               >编辑</button>
 
               <button
@@ -256,7 +257,9 @@
   const warehouseForm = document.getElementById("warehouseForm");
   const modalTitle = document.getElementById("modalTitle");
   const fName = document.getElementById("f_name");
+  const fType = document.getElementById("f_type");
   const fActive = document.getElementById("f_active");
+  const defaultType = "{{ default_warehouse_type|default:'BOTH' }}";
 
   const toggleForm = document.getElementById("toggleForm");
   const toggleTitle = document.getElementById("toggleTitle");
@@ -287,6 +290,7 @@
     modalTitle.textContent = "新增仓库";
     warehouseForm.action = "{% url 'products:warehouse_create' %}";
     fName.value = "";
+    fType.value = defaultType || "BOTH";
     fActive.checked = true;
     openModal(modalForm);
   });
@@ -324,6 +328,7 @@
         modalTitle.textContent = "编辑仓库";
         warehouseForm.action = `/warehouses/${pk}/edit/`;
         fName.value = btn.dataset.name || "";
+        fType.value = btn.dataset.type || defaultType || "BOTH";
         fActive.checked = btn.dataset.active === "1";
         openModal(modalForm);
       }

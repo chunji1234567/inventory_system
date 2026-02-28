@@ -31,6 +31,7 @@ def warehouse_list(request):
         "unit_form": unit_form,
         "partners": partners,
         "partner_form": partner_form,
+        "default_warehouse_type": _default_warehouse_type(request.user),
     })
 
 

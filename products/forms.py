@@ -4,7 +4,7 @@ from .models import Warehouse, Unit, Partner
 class WarehouseForm(forms.ModelForm):
     class Meta:
         model = Warehouse
-        fields = ["name", "is_active"]
+        fields = ["name", "warehouse_type", "is_active"]
 
 
 class UnitForm(forms.ModelForm):
