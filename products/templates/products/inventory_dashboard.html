@@ -21,6 +21,11 @@
       class="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200">
       查看低库存
     </button>
+
+    <a href="{% url 'products:stock_import_start' %}"
+      class="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      批量导入
+    </a>
   </div>
 </div>
 

@@ -1,0 +1,70 @@
+{% extends "products/base.html" %}
+{% block title %}批量导入{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900">批量入库/出库</h1>
+    <p class="text-sm text-slate-500">上传固定模板的 Excel，系统会先解析并供你复核后再执行</p>
+  </div>
+  <a href="{% url 'products:inventory_dashboard' %}"
+    class="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200">
+    返回库存
+  </a>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-3">
+  <form method="post" enctype="multipart/form-data" class="lg:col-span-2 space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-medium text-slate-700">
+        操作类型
+        <select name="action_type" required
+          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+          {% for value, label in action_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700">
+        Excel 文件（.xlsx）
+        <input type="file" name="file" accept=".xlsx" required
+          class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
+      </label>
+      <p class="mt-2 text-xs text-slate-500">
+        每次最多导入 {{ max_rows }} 条记录。上传后系统会进入预览页，你可以逐条检查并确认后再正式写入库存。
+      </p>
+      <p class="mt-1 text-xs text-slate-500">
+        表头请保持固定顺序：
+        <span class="font-semibold text-slate-700">{{ header_fields|join:"，" }}</span>
+        ，可在下方说明中下载模板。
+      </p>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <button type="submit"
+        class="inline-flex items-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
+        上传并解析
+      </button>
+      <a href="{% url 'products:stock_import_template' %}"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200">
+        下载导入模板
+      </a>
+    </div>
+  </form>
+
+  <div class="space-y-4 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-5 text-sm text-slate-700">
+    <h2 class="text-base font-semibold text-slate-900">模板说明</h2>
+    <ul class="list-disc space-y-2 pl-5 text-slate-600">
+      <li>第 1 行必须是表头，依次为：{{ header_fields|join:"、" }}。</li>
+      <li>数量需填写正整数；批量出库会自动扣减库存，若库存不足会在预览页提示。</li>
+      <li>仓库、物品名称需与系统中保持一致，且必须是你有权限的仓库。</li>
+      <li>上传后数据会在 30 分钟内有效，若超过时间需要重新上传。</li>
+      <li>建议每个文件控制在 {{ max_rows }} 行以内，方便核对及回滚。</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
