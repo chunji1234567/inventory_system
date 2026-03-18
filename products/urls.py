@@ -11,12 +11,7 @@ from products.views.warehouse import (
 from products.views.stockmove import inbound_create, outbound_create, adjust_create
 from products.views.stockmove_list import stockmove_list, stockmove_export
 from products.views.item import item_create, item_update, item_toggle_active
-from products.views.importer import (
-    stock_import_start,
-    stock_import_preview,
-    stock_import_confirm,
-    stock_import_template,
-)
+from products.views.importer import stock_import_start
 
 
 app_name = "products"
@@ -24,9 +19,6 @@ app_name = "products"
 urlpatterns = [
     path("inventory/", inventory_dashboard, name="inventory_dashboard"),
     path("inventory/import/", stock_import_start, name="stock_import_start"),
-    path("inventory/import/template/", stock_import_template, name="stock_import_template"),
-    path("inventory/import/<str:session_id>/", stock_import_preview, name="stock_import_preview"),
-    path("inventory/import/<str:session_id>/confirm/", stock_import_confirm, name="stock_import_confirm"),
 
     path("warehouses/", warehouse_list, name="warehouse_list"),
     path("warehouses/new/", warehouse_create, name="warehouse_create"),

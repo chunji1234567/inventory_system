@@ -1,70 +1,349 @@
 {% extends "products/base.html" %}
-{% block title %}批量导入{% endblock %}
+{% block title %}批量操作{% endblock %}
 
 {% block content %}
-<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-  <div>
-    <h1 class="text-2xl font-semibold text-slate-900">批量入库/出库</h1>
-    <p class="text-sm text-slate-500">上传固定模板的 Excel，系统会先解析并供你复核后再执行</p>
+<div class="max-w-[1600px] mx-auto">
+  <div class="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-slate-900 rounded-xl">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">批量进出库管理</h1>
+      </div>
+    </div>
+    <a href="{% url 'products:inventory_dashboard' %}"
+      class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:border-slate-300 active:scale-95">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+      返回库存
+    </a>
   </div>
-  <a href="{% url 'products:inventory_dashboard' %}"
-    class="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200">
-    返回库存
-  </a>
-</div>
 
-<div class="mt-6 grid gap-6 lg:grid-cols-3">
-  <form method="post" enctype="multipart/form-data" class="lg:col-span-2 space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+  <form id="bulkForm" method="post" class="space-y-6">
     {% csrf_token %}
-    <div>
-      <label class="block text-sm font-medium text-slate-700">
-        操作类型
-        <select name="action_type" required
-          class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
-          {% for value, label in action_choices %}
-            <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
+    <input type="hidden" name="payload" id="bulkPayload">
+
+    <div class="grid gap-6 lg:grid-cols-12">
+      <div class="lg:col-span-4 space-y-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ring-1 ring-slate-900/5">
+          <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">配置参数</h3>
+          
+          <div class="space-y-5">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">操作类型</label>
+              <select name="action_type" class="w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none">
+                {% for value, label in action_choices %}
+                  <option value="{{ value }}" {% if selected_action == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+              <div class="flex gap-3">
+                <div class="text-xs leading-relaxed text-indigo-900/80">
+                  <strong class="block text-indigo-900 mb-1">操作指南：</strong>
+                  1. 筛选物品并点击“加入操作”<br>
+                  2. 在右侧列表修正数量与合作方<br>
+                  3. 系统将自动校验出库库存
+                </div>
+              </div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">目标仓库</label>
+                <select id="filterWarehouse" class="w-full rounded-xl border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:ring-4 focus:ring-slate-500/5 transition-all outline-none">
+                  <option value="">全部仓库项目</option>
+                  {% for w in warehouses %}
+                    <option value="{{ w.id }}">{{ w.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">快速检索</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </span>
+                  <input id="filterSearch" type="text" placeholder="输入物品名称或编号..."
+                    class="w-full rounded-xl border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-slate-500 focus:ring-4 focus:ring-slate-500/5 transition-all outline-none" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-8 space-y-6">
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider">待选库位物品</h2>
+          </div>
+          <div class="max-h-[320px] overflow-y-auto">
+            <table class="w-full text-sm text-left">
+              <thead class="sticky top-0 bg-white shadow-sm text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+                <tr>
+                  <th class="px-6 py-3">所属仓库</th>
+                  <th class="px-6 py-3">物品详情</th>
+                  <th class="px-6 py-3 text-right">现有库存</th>
+                  <th class="px-6 py-3 text-center w-24">操作</th>
+                </tr>
+              </thead>
+              <tbody id="candidateTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <div id="candidateEmpty" class="hidden py-12 text-center text-slate-400">
+              <svg class="mx-auto h-8 w-8 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <p>未找到符合条件的物品</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-md overflow-hidden ring-2 ring-slate-900/[0.02]">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider">批量提交清单</h2>
+              <span id="selectedCountBadge" class="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span>
+            </div>
+            <button type="button" id="clearSelection" class="text-xs font-semibold text-red-500 hover:text-red-700 transition disabled:opacity-30" disabled>
+              清空全部
+            </button>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-slate-50/80 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-100">
+                <tr>
+                  <th class="px-6 py-3 w-48">物品 / 仓库</th>
+                  <th class="px-6 py-3 w-28">数量</th>
+                  <th class="px-6 py-3 w-36">合作方</th>
+                  <th class="px-6 py-3">单号/来源/备注</th>
+                  <th class="px-6 py-3 text-center w-16">移除</th>
+                </tr>
+              </thead>
+              <tbody id="selectedTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+            </table>
+          </div>
+          <div id="selectedEmpty" class="py-16 text-center text-slate-400 bg-slate-50/30">
+            <p class="text-sm">尚未添加任何操作项，请从上方列表选择</p>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-slate-700">
-        Excel 文件（.xlsx）
-        <input type="file" name="file" accept=".xlsx" required
-          class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200">
-      </label>
-      <p class="mt-2 text-xs text-slate-500">
-        每次最多导入 {{ max_rows }} 条记录。上传后系统会进入预览页，你可以逐条检查并确认后再正式写入库存。
-      </p>
-      <p class="mt-1 text-xs text-slate-500">
-        表头请保持固定顺序：
-        <span class="font-semibold text-slate-700">{{ header_fields|join:"，" }}</span>
-        ，可在下方说明中下载模板。
-      </p>
-    </div>
-
-    <div class="flex flex-wrap gap-3">
+    <div class="flex items-center justify-end gap-4 pb-12 pt-6">
+      <span class="text-sm text-slate-500">确认无误后点击提交，系统将生成流水日志</span>
       <button type="submit"
-        class="inline-flex items-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
-        上传并解析
+        class="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition-all hover:bg-slate-800 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 focus:outline-none focus:ring-4 focus:ring-slate-900/10">
+        <span>确认提交</span>
+        <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
       </button>
-      <a href="{% url 'products:stock_import_template' %}"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200">
-        下载导入模板
-      </a>
     </div>
   </form>
-
-  <div class="space-y-4 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-5 text-sm text-slate-700">
-    <h2 class="text-base font-semibold text-slate-900">模板说明</h2>
-    <ul class="list-disc space-y-2 pl-5 text-slate-600">
-      <li>第 1 行必须是表头，依次为：{{ header_fields|join:"、" }}。</li>
-      <li>数量需填写正整数；批量出库会自动扣减库存，若库存不足会在预览页提示。</li>
-      <li>仓库、物品名称需与系统中保持一致，且必须是你有权限的仓库。</li>
-      <li>上传后数据会在 30 分钟内有效，若超过时间需要重新上传。</li>
-      <li>建议每个文件控制在 {{ max_rows }} 行以内，方便核对及回滚。</li>
-    </ul>
-  </div>
 </div>
+
+{{ items_data|json_script:"bulk-items" }}
+{{ initial_rows|json_script:"bulk-initial" }}
+{{ partners|json_script:"bulk-partners" }}
+
+<style>
+  /* 微动效：添加行时的淡入效果 */
+  @keyframes fadeInRow {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-row { animation: fadeInRow 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+  
+  /* 自定义滚动条 */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+</style>
+
+<script>
+// 此处保留你原有的 JS 逻辑，仅在 renderSelectedRows 和 renderCandidates 中更新 HTML 字符串的类名
+// 建议在 addRow 逻辑中给 tr 加上 'animate-row' class
+(function () {
+  const itemsData = JSON.parse(document.getElementById('bulk-items').textContent || '[]');
+  const initialRows = JSON.parse(document.getElementById('bulk-initial').textContent || '[]');
+  const partners = JSON.parse(document.getElementById('bulk-partners').textContent || '[]');
+
+  const itemLookup = new Map(itemsData.map((item) => [String(item.id), item]));
+  const selectedMap = new Map();
+
+  const candidateBody = document.getElementById('candidateTableBody');
+  const candidateEmpty = document.getElementById('candidateEmpty');
+  const selectedBody = document.getElementById('selectedTableBody');
+  const selectedEmpty = document.getElementById('selectedEmpty');
+  const filterWarehouse = document.getElementById('filterWarehouse');
+  const filterSearch = document.getElementById('filterSearch');
+  const selectedCountBadge = document.getElementById('selectedCountBadge');
+  const clearButton = document.getElementById('clearSelection');
+  const form = document.getElementById('bulkForm');
+  const payloadInput = document.getElementById('bulkPayload');
+
+  const createRowId = () => (
+    window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : `row-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+
+  function renderCandidates() {
+    candidateBody.innerHTML = '';
+    const warehouseFilter = filterWarehouse.value;
+    const keyword = filterSearch.value.trim().toLowerCase();
+
+    const filtered = itemsData.filter((item) => {
+      if (warehouseFilter && String(item.warehouse_id) !== warehouseFilter) return false;
+      if (!keyword) return true;
+      return (item.name || '').toLowerCase().includes(keyword) || (item.warehouse_name || '').toLowerCase().includes(keyword);
+    });
+
+    if (!filtered.length) {
+      candidateEmpty.classList.remove('hidden');
+      return;
+    }
+    candidateEmpty.classList.add('hidden');
+
+    filtered.slice(0, 100).forEach((item) => {
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 transition-colors group';
+
+      tr.innerHTML = `
+        <td class="px-6 py-4 text-slate-500 font-medium">${item.warehouse_name || '—'}</td>
+        <td class="px-6 py-4">
+          <div class="text-slate-900 font-semibold">${item.name}</div>
+        </td>
+        <td class="px-6 py-4 text-right tabular-nums text-slate-600 font-bold">${item.on_hand}</td>
+        <td class="px-6 py-4 text-center">
+          <button type="button" class="add-btn inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </td>
+      `;
+      tr.querySelector('.add-btn').addEventListener('click', () => addRow(item));
+      candidateBody.appendChild(tr);
+    });
+  }
+
+  function renderSelectedRows() {
+    selectedBody.innerHTML = '';
+    if (!selectedMap.size) {
+      selectedEmpty.classList.remove('hidden');
+      clearButton.disabled = true;
+    } else {
+      selectedEmpty.classList.add('hidden');
+      clearButton.disabled = false;
+    }
+
+    selectedMap.forEach((row, rowId) => {
+      const item = itemLookup.get(String(row.item_id));
+      if (!item) return;
+      const tr = document.createElement('tr');
+      tr.className = 'animate-row group';
+
+      tr.innerHTML = `
+        <td class="px-6 py-4">
+          <div class="text-slate-900 font-bold">${item.name}</div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-tight">${item.warehouse_name || '—'}</div>
+        </td>
+        <td class="px-6 py-4">
+          <div class="flex flex-col gap-1">
+            <input type="number" min="1" step="1" required value="${row.quantity}" 
+              class="qty-input w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-1.5 text-right font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+            <div class="text-[10px] text-right text-slate-400">现有: ${item.on_hand}</div>
+          </div>
+        </td>
+        <td class="px-6 py-4">
+          <select class="partner-select w-full rounded-lg border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-500 transition-all">
+            <option value="">— 选择合作方 —</option>
+            ${partners.map(p => `<option value="${p.id}" ${String(p.id) === String(row.partner_id) ? 'selected' : ''}>${p.name}</option>`).join('')}
+          </select>
+        </td>
+        <td class="px-6 py-4 space-y-2">
+          <input type="text" placeholder="单号/来源" value="${row.reference || ''}" 
+            class="ref-input w-full rounded-lg border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 focus:border-slate-400 outline-none">
+          <input type="text" placeholder="备注信息" value="${row.note || ''}" 
+            class="note-input w-full rounded-lg border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 focus:border-slate-400 outline-none">
+        </td>
+        <td class="px-6 py-4 text-center">
+          <button type="button" class="remove-btn text-slate-300 hover:text-red-500 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </td>
+      `;
+
+      tr.querySelector('.qty-input').addEventListener('input', (e) => row.quantity = e.target.value);
+      tr.querySelector('.partner-select').addEventListener('change', (e) => row.partner_id = e.target.value);
+      tr.querySelector('.ref-input').addEventListener('input', (e) => row.reference = e.target.value);
+      tr.querySelector('.note-input').addEventListener('input', (e) => row.note = e.target.value);
+      tr.querySelector('.remove-btn').addEventListener('click', () => {
+        selectedMap.delete(rowId);
+        renderSelectedRows();
+      });
+
+      selectedBody.appendChild(tr);
+    });
+
+    selectedCountBadge.textContent = selectedMap.size;
+  }
+
+  function addRow(item, preset = {}) {
+    const rowId = preset.client_id || createRowId();
+    selectedMap.set(rowId, {
+      client_id: rowId,
+      warehouse_id: item.warehouse_id,
+      item_id: item.id,
+      quantity: preset.quantity || '',
+      reference: preset.reference || '',
+      note: preset.note || '',
+      partner_id: preset.partner_id ? String(preset.partner_id) : '',
+    });
+    renderSelectedRows();
+  }
+
+  function hydrateInitialRows() {
+    initialRows.forEach((row) => {
+      const item = itemLookup.get(String(row.item_id));
+      if (item) addRow(item, row);
+    });
+  }
+
+  clearButton.addEventListener('click', () => {
+    if(confirm('确定要清空已选列表吗？')) {
+      selectedMap.clear();
+      renderSelectedRows();
+    }
+  });
+
+  filterWarehouse.addEventListener('change', renderCandidates);
+  filterSearch.addEventListener('input', () => {
+    window.clearTimeout(filterSearch._timer);
+    filterSearch._timer = window.setTimeout(renderCandidates, 150);
+  });
+
+  form.addEventListener('submit', (e) => {
+    if (!selectedMap.size) {
+      e.preventDefault();
+      alert('清单为空，请先添加物品');
+      return;
+    }
+    const payload = Array.from(selectedMap.values());
+    if (payload.some(r => !r.quantity)) {
+      e.preventDefault();
+      alert('请确保所有行都已填写数量');
+      return;
+    }
+    payloadInput.value = JSON.stringify(payload);
+  });
+
+  renderCandidates();
+  hydrateInitialRows();
+})();
+</script>
 {% endblock %}
